@@ -128,6 +128,21 @@
         .dot.active {
             background: #F3BA2F;
         }
+
+        /* Price Label updated for better distance and visibility */
+        #chart-price-label {
+            position: absolute;
+            right: 8px;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            z-index: 10;
+            pointer-events: none;
+            transition: top 0.1s linear, background-color 0.2s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
     </style>
 </head>
 <body class="flex flex-col h-screen">
@@ -174,7 +189,6 @@
             </div>
         </div>
 
-        <!-- Mode Toggle Buttons -->
         <div class="flex items-center space-x-2">
             <div id="leverage-selector-container" class="hidden flex items-center bg-[#2b3139] rounded px-2 py-0.5 border border-gray-custom">
                 <span class="text-[9px] font-bold text-gray-500 mr-2 uppercase">Leverage</span>
@@ -205,7 +219,7 @@
                     <button class="text-yellow-400 font-bold">Time</button>
                     <button class="hover:text-white px-2 bg-gray-800 rounded">5s</button>
                 </div>
-                <div id="volatility-info" class="text-[9px] text-gray-600 uppercase tracking-widest font-bold">1-3% Move / Sec | 5s Candle Closure</div>
+                <div id="volatility-info" class="text-[9px] text-gray-600 uppercase tracking-widest font-bold">5s Candle Closure</div>
             </div>
             
             <div id="chart-container" class="flex-1 relative overflow-hidden">
@@ -221,7 +235,8 @@
                 <div id="chart-tooltip"></div>
                 
                 <canvas id="trading-chart"></canvas>
-                <div id="chart-price-label" class="absolute right-0 top-1/2 bg-buy text-white px-2 py-0.5 text-[10px] font-bold pointer-events-none transition-all duration-100 z-10">45,905.30</div>
+                <!-- Updated Price Label element -->
+                <div id="chart-price-label">45,905.30</div>
             </div>
         </div>
 
@@ -360,8 +375,8 @@
 
     <script>
         // --- STATE ---
-        const INITIAL_TOTAL_BALANCE = 10000.00;
-        let usdtBalance = 10000.00;
+        const INITIAL_TOTAL_BALANCE = 1000.00;
+        let usdtBalance = 1000.00;
         let btcBalance = 0.00000000; 
         let initialPrice = 45000.00;
         let currentPrice = 45000.00;
@@ -525,9 +540,8 @@
         const tabSellBtn = document.getElementById('tab-sell');
         if (tabSellBtn) tabSellBtn.onclick = () => setTradeTab('sell');
 
-        // Logic for 1-3%
         function getRandomVolatility() {
-            const integerPart = Math.floor(Math.random() * 3) + 1; // 1, 2, or 3
+            const integerPart = Math.floor(Math.random() * 1) + 1;
             const decimalPart = Math.random() * 0.98 + 0.01;
             return (integerPart + decimalPart) / 100;
         }
@@ -553,7 +567,8 @@
             const h = canvas.height;
             const w = canvas.width;
             const chartH = h - padding * 2;
-            const chartW = w - padding;
+            // Increased safe distance from the right labels (Gutter Width)
+            const chartW = w - 110; 
             const minP = Math.min(...candles.map(c => c.low)) * 0.90; 
             const maxP = Math.max(...candles.map(c => c.high)) * 1.10;
             const range = maxP - minP;
@@ -632,10 +647,7 @@
         }
 
         function triggerLiquidation() {
-            btcBalance = 0;
-            entryPrice = 0;
-            liquidationPrice = 0;
-            usdtBalance = 0; 
+            btcBalance = 0; entryPrice = 0; liquidationPrice = 0; usdtBalance = 0; 
             showAlert("LIQUIDATED! Position forced closed at 0 margin.", "#f84960");
             updateUI();
         }
@@ -646,10 +658,7 @@
             const priceChange = currentPrice * percentageChange * direction;
             lastPrice = currentPrice; currentPrice += priceChange;
 
-            if (checkLiquidation()) {
-                triggerLiquidation();
-                return;
-            }
+            if (checkLiquidation()) { triggerLiquidation(); return; }
 
             let currentCandle = candles[candles.length - 1];
             currentCandle.close = currentPrice;
@@ -669,12 +678,25 @@
         function drawChart() {
             if (!canvas || !canvas.width) return;
             const s = getChartScale(); ctx.clearRect(0, 0, s.w, s.h);
-            ctx.strokeStyle = '#2b3139'; ctx.setLineDash([4, 4]); ctx.lineWidth = 0.5;
-            for(let i = 0; i <= 4; i++) {
-                let py = getY(s.minP + (s.range / 4) * i, s);
-                ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(s.w, py); ctx.stroke();
+            
+            // Draw Vertical Gutter Line with more padding from the candle drawing area
+            const gutterOffset = 25;
+            ctx.strokeStyle = '#2b3139'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(s.chartW + gutterOffset, 0); ctx.lineTo(s.chartW + gutterOffset, s.h); ctx.stroke();
+
+            // Background Grid & Static Price Labels
+            ctx.strokeStyle = '#1e2329'; ctx.setLineDash([4, 4]); ctx.lineWidth = 0.5;
+            ctx.fillStyle = '#474d57'; ctx.font = '10px JetBrains Mono';
+            for(let i = 0; i <= 5; i++) {
+                let price = s.minP + (s.range / 5) * i;
+                let py = getY(price, s);
+                ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(s.chartW + gutterOffset, py); ctx.stroke();
+                // Push static labels further right to prevent overlap with badge
+                ctx.fillText(formatNum(price, 0), s.chartW + gutterOffset + 10, py + 3);
             }
             ctx.setLineDash([]);
+
+            // Draw Candles
             const candleWidth = (s.chartW / MAX_CANDLES) * 0.6;
             candles.forEach((c, i) => {
                 const x = getX(i, s); const isUp = c.close >= c.open; const color = isUp ? '#00c087' : '#f84960';
@@ -683,6 +705,19 @@
                 const bTop = getY(Math.max(c.open, c.close), s); const bBot = getY(Math.min(c.open, c.close), s);
                 ctx.fillRect(x - candleWidth/2, bTop, candleWidth, Math.max(1, bBot - bTop));
             });
+
+            // Draw current price dashed line 
+            const py = getY(currentPrice, s);
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = currentPrice >= lastPrice ? 'rgba(0, 192, 135, 0.5)' : 'rgba(248, 73, 96, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, py);
+            ctx.lineTo(s.chartW + gutterOffset, py);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Drawings
             ctx.lineWidth = 2; ctx.strokeStyle = '#f3ba2f';
             drawings.forEach(d => {
                 ctx.beginPath(); ctx.moveTo(getX(d.startIdx, s), getY(d.startPrice, s));
@@ -693,21 +728,22 @@
                 ctx.moveTo(drawingStart.x, drawingStart.y); ctx.lineTo(drawingCurrent.x, drawingCurrent.y); ctx.stroke();
             }
 
+            // Futures Liq Line
             if (tradingMode === 'futures' && btcBalance !== 0) {
                 const liqY = getY(liquidationPrice, s);
-                ctx.setLineDash([8, 4]);
-                ctx.strokeStyle = '#3b82f6';
-                ctx.lineWidth = 1.5;
-                ctx.beginPath(); ctx.moveTo(0, liqY); ctx.lineTo(s.w, liqY); ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.fillStyle = '#3b82f6'; ctx.font = 'bold 9px Inter';
-                ctx.fillText('LIQ: ' + formatNum(liquidationPrice), s.w - 110, liqY - 5);
+                ctx.setLineDash([8, 4]); ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.moveTo(0, liqY); ctx.lineTo(s.chartW + gutterOffset, liqY); ctx.stroke();
+                ctx.setLineDash([]); ctx.fillStyle = '#3b82f6'; ctx.font = 'bold 9px Inter';
+                ctx.fillText('LIQ: ' + formatNum(liquidationPrice), s.chartW - 130, liqY - 5);
             }
 
+            // Update DOM Price Label (the colored badge in the gutter)
             const label = document.getElementById('chart-price-label');
             if (label) {
-                const py = getY(currentPrice, s); label.style.top = `${py - 10}px`; label.innerText = formatNum(currentPrice);
-                label.className = `absolute right-0 px-2 py-0.5 text-[10px] font-bold pointer-events-none transition-all duration-100 z-10 ${currentPrice >= lastPrice ? 'bg-buy' : 'bg-sell'}`;
+                label.style.top = `${py - 12}px`; // Center vertically
+                label.innerText = formatNum(currentPrice);
+                label.style.backgroundColor = currentPrice >= lastPrice ? '#00c087' : '#f84960';
+                label.style.color = '#000';
             }
         }
 
