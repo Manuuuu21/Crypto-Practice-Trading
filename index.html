@@ -140,7 +140,6 @@
             </div>
         </div>
         <div class="flex items-center space-x-4">
-            <!-- Reset Button -->
             <button onclick="resetApp()" class="flex items-center space-x-1.5 px-3 py-1.5 bg-[#2b3139] hover:bg-[#474d57] border border-gray-custom rounded transition-all text-gray-300 hover:text-white group">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="group-hover:rotate-[-45deg] transition-transform duration-300"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
                 <span class="text-[10px] font-bold uppercase tracking-wider">Reset</span>
@@ -206,11 +205,10 @@
                     <button class="text-yellow-400 font-bold">Time</button>
                     <button class="hover:text-white px-2 bg-gray-800 rounded">5s</button>
                 </div>
-                <div id="volatility-info" class="text-[9px] text-gray-600 uppercase tracking-widest font-bold">1-5% Move / Sec | 5s Candle Closure</div>
+                <div id="volatility-info" class="text-[9px] text-gray-600 uppercase tracking-widest font-bold">1-3% Move / Sec | 5s Candle Closure</div>
             </div>
             
             <div id="chart-container" class="flex-1 relative overflow-hidden">
-                <!-- Drawing Tools Toolbar -->
                 <div class="drawing-tools">
                     <div id="tool-line" class="tool-btn" title="Trendline">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4"></line></svg>
@@ -220,7 +218,6 @@
                     </div>
                 </div>
 
-                <!-- Tooltip Overlay -->
                 <div id="chart-tooltip"></div>
                 
                 <canvas id="trading-chart"></canvas>
@@ -268,7 +265,6 @@
                         <span id="available-funds-label" class="text-gray-300 mono">10,000.00 USDT</span>
                     </div>
 
-                    <!-- Price Input -->
                     <div class="relative group bg-[#2b3139] rounded-md border border-transparent focus-within:border-yellow-400 transition-all duration-200">
                         <label class="text-[9px] text-gray-500 absolute left-2 top-2 font-bold uppercase tracking-wider">Price</label>
                         <div class="flex items-center px-2 pt-5 pb-1.5">
@@ -277,7 +273,6 @@
                         </div>
                     </div>
 
-                    <!-- Amount Input -->
                     <div class="relative group bg-[#2b3139] rounded-md border border-transparent focus-within:border-yellow-400 transition-all duration-200">
                         <label class="text-[9px] text-gray-500 absolute left-2 top-2 font-bold uppercase tracking-wider">Amount</label>
                         <div class="flex items-center px-2 pt-5 pb-1.5">
@@ -302,7 +297,6 @@
                         <span>100%</span>
                     </div>
 
-                    <!-- Balance Summary -->
                     <div class="bg-[#0b0e11] p-3 rounded border border-gray-custom/30 text-[10px] space-y-2">
                         <div class="flex justify-between text-gray-500 font-medium">
                             <span id="summary-usdt-label">Total USDT</span>
@@ -396,6 +390,14 @@
         const container = document.getElementById('chart-container');
         const tooltip = document.getElementById('chart-tooltip');
 
+        // Helper for formatting with commas
+        function formatNum(num, decimals = 2) {
+            return num.toLocaleString('en-US', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals
+            });
+        }
+
         // --- INIT ---
         window.onload = () => {
             initChartData();
@@ -449,16 +451,12 @@
             entryPrice = 0;
             liquidationPrice = 0;
             drawings = [];
-            
             const inputSizeEl = document.getElementById('input-size');
             if (inputSizeEl) inputSizeEl.value = "";
-            
             const ruler = document.getElementById('money-ruler');
             if (ruler) ruler.value = 0;
-            
             currentSliderPct = 0;
             updateSliderDots(0);
-            
             updateUI();
             drawChart();
             showAlert("Account Reset to 10,000 USDT", "#F3BA2F");
@@ -515,7 +513,6 @@
                     btnAction.innerText = tradingMode === 'spot' ? "Sell BTC" : "Open Short";
                 }
             }
-
             currentSliderPct = 0;
             const ruler = document.getElementById('money-ruler');
             if (ruler) ruler.value = 0;
@@ -528,8 +525,9 @@
         const tabSellBtn = document.getElementById('tab-sell');
         if (tabSellBtn) tabSellBtn.onclick = () => setTradeTab('sell');
 
+        // Logic for 1-3%
         function getRandomVolatility() {
-            const integerPart = Math.floor(Math.random() * 5) + 1;
+            const integerPart = Math.floor(Math.random() * 3) + 1; // 1, 2, or 3
             const decimalPart = Math.random() * 0.98 + 0.01;
             return (integerPart + decimalPart) / 100;
         }
@@ -592,10 +590,10 @@
                 tooltip.style.top = (mouseY - 20) + 'px';
                 tooltip.innerHTML = `
                     <div class="font-bold text-gray-500 mb-1 tracking-tighter">CANDLE DATA (5s)</div>
-                    <div class="flex justify-between gap-4"><span>Open:</span> <span class="mono">${c.open.toFixed(2)}</span></div>
-                    <div class="flex justify-between gap-4"><span>Close:</span> <span class="mono">${c.close.toFixed(2)}</span></div>
-                    <div class="flex justify-between gap-4"><span>High:</span> <span class="mono">${c.high.toFixed(2)}</span></div>
-                    <div class="flex justify-between gap-4"><span>Low:</span> <span class="mono">${c.low.toFixed(2)}</span></div>
+                    <div class="flex justify-between gap-4"><span>Open:</span> <span class="mono">${formatNum(c.open)}</span></div>
+                    <div class="flex justify-between gap-4"><span>Close:</span> <span class="mono">${formatNum(c.close)}</span></div>
+                    <div class="flex justify-between gap-4"><span>High:</span> <span class="mono">${formatNum(c.high)}</span></div>
+                    <div class="flex justify-between gap-4"><span>Low:</span> <span class="mono">${formatNum(c.low)}</span></div>
                     <div class="border-t border-gray-700 mt-2 pt-2 flex justify-between items-center">
                         <span class="font-bold">CHANGE:</span>
                         <span class="mono font-bold ${pct >= 0 ? 'text-buy' : 'text-sell'}">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</span>
@@ -703,12 +701,12 @@
                 ctx.beginPath(); ctx.moveTo(0, liqY); ctx.lineTo(s.w, liqY); ctx.stroke();
                 ctx.setLineDash([]);
                 ctx.fillStyle = '#3b82f6'; ctx.font = 'bold 9px Inter';
-                ctx.fillText('LIQ: ' + liquidationPrice.toFixed(2), s.w - 110, liqY - 5);
+                ctx.fillText('LIQ: ' + formatNum(liquidationPrice), s.w - 110, liqY - 5);
             }
 
             const label = document.getElementById('chart-price-label');
             if (label) {
-                const py = getY(currentPrice, s); label.style.top = `${py - 10}px`; label.innerText = currentPrice.toFixed(2);
+                const py = getY(currentPrice, s); label.style.top = `${py - 10}px`; label.innerText = formatNum(currentPrice);
                 label.className = `absolute right-0 px-2 py-0.5 text-[10px] font-bold pointer-events-none transition-all duration-100 z-10 ${currentPrice >= lastPrice ? 'bg-buy' : 'bg-sell'}`;
             }
         }
@@ -719,13 +717,13 @@
             let asksHTML = '', bidsHTML = '';
             for(let i = 0; i < 12; i++) {
                 const ap = currentPrice + (12 - i) * (currentPrice * 0.01); const as = (Math.random() * 2).toFixed(3);
-                asksHTML += `<div class="grid grid-cols-3 relative px-1 py-[1.5px] orderbook-row"><div class="absolute right-0 top-0 bottom-0 bg-sell opacity-10" style="width: ${Math.random()*70}%"></div><span class="text-sell font-bold">${ap.toFixed(1)}</span><span class="text-right text-gray-300 font-medium">${as}</span><span class="text-right text-gray-500 font-medium">${(ap * as / 1000).toFixed(2)}k</span></div>`;
+                asksHTML += `<div class="grid grid-cols-3 relative px-1 py-[1.5px] orderbook-row"><div class="absolute right-0 top-0 bottom-0 bg-sell opacity-10" style="width: ${Math.random()*70}%"></div><span class="text-sell font-bold">${formatNum(ap, 1)}</span><span class="text-right text-gray-300 font-medium">${as}</span><span class="text-right text-gray-500 font-medium">${(ap * as / 1000).toFixed(2)}k</span></div>`;
                 const bp = currentPrice - (i + 1) * (currentPrice * 0.01); const bs = (Math.random() * 2).toFixed(3);
-                bidsHTML += `<div class="grid grid-cols-3 relative px-1 py-[1.5px] orderbook-row"><div class="absolute right-0 top-0 bottom-0 bg-buy opacity-10" style="width: ${Math.random()*70}%"></div><span class="text-buy font-bold">${bp.toFixed(1)}</span><span class="text-right text-gray-300 font-medium">${bs}</span><span class="text-right text-gray-500 font-medium">${(bp * bs / 1000).toFixed(2)}k</span></div>`;
+                bidsHTML += `<div class="grid grid-cols-3 relative px-1 py-[1.5px] orderbook-row"><div class="absolute right-0 top-0 bottom-0 bg-buy opacity-10" style="width: ${Math.random()*70}%"></div><span class="text-buy font-bold">${formatNum(bp, 1)}</span><span class="text-right text-gray-300 font-medium">${bs}</span><span class="text-right text-gray-500 font-medium">${(bp * bs / 1000).toFixed(2)}k</span></div>`;
             }
             asksCont.innerHTML = asksHTML; bidsCont.innerHTML = bidsHTML;
             const midPriceEl = document.getElementById('mid-price');
-            if (midPriceEl) { midPriceEl.innerText = currentPrice.toFixed(2); midPriceEl.className = `text-sm font-bold mono ${currentPrice >= lastPrice ? 'text-buy' : 'text-sell'}`; }
+            if (midPriceEl) { midPriceEl.innerText = formatNum(currentPrice); midPriceEl.className = `text-sm font-bold mono ${currentPrice >= lastPrice ? 'text-buy' : 'text-sell'}`; }
         }
 
         function updateUI() {
@@ -741,13 +739,13 @@
             const totalPnlPct = (((totalVal / INITIAL_TOTAL_BALANCE) - 1) * 100).toFixed(2);
             
             const tickerPriceEl = document.getElementById('ticker-price');
-            if (tickerPriceEl) tickerPriceEl.innerText = currentPrice.toFixed(2);
+            if (tickerPriceEl) tickerPriceEl.innerText = formatNum(currentPrice);
             
             const walletHeaderEl = document.getElementById('wallet-balance-header');
-            if (walletHeaderEl) walletHeaderEl.innerText = totalVal.toLocaleString('en-US', {minimumFractionDigits: 2});
+            if (walletHeaderEl) walletHeaderEl.innerText = formatNum(totalVal);
             
             const availUsdtEl = document.getElementById('available-usdt');
-            if (availUsdtEl) availUsdtEl.innerText = usdtBalance.toLocaleString('en-US', {minimumFractionDigits: 2});
+            if (availUsdtEl) availUsdtEl.innerText = formatNum(usdtBalance);
             
             const availBtcEl = document.getElementById('available-btc');
             if (availBtcEl) availBtcEl.innerText = btcBalance.toFixed(8);
@@ -762,18 +760,18 @@
                 if (maxPossibleValEl) maxPossibleValEl.innerText = max.toFixed(6) + " BTC";
                 if (maxPossibleLabelEl) maxPossibleLabelEl.innerText = currentMode === 'buy' ? "Max Buy Power" : "Max Sell Power";
                 if (availFundText) availFundText.innerText = "Available";
-                if (availFundsLabelEl) availFundsLabelEl.innerText = currentMode === 'buy' ? usdtBalance.toFixed(2) + " USDT" : btcBalance.toFixed(6) + " BTC";
+                if (availFundsLabelEl) availFundsLabelEl.innerText = currentMode === 'buy' ? formatNum(usdtBalance) + " USDT" : btcBalance.toFixed(6) + " BTC";
             } else {
                 const buyingPower = usdtBalance * leverage;
                 const max = buyingPower / currentPrice;
                 if (maxPossibleValEl) maxPossibleValEl.innerText = max.toFixed(6) + " BTC";
                 if (maxPossibleLabelEl) maxPossibleLabelEl.innerText = "Max Buying Power";
                 if (availFundText) availFundText.innerText = "Avbl Margin";
-                if (availFundsLabelEl) availFundsLabelEl.innerText = usdtBalance.toFixed(2) + " USDT";
+                if (availFundsLabelEl) availFundsLabelEl.innerText = formatNum(usdtBalance) + " USDT";
             }
 
             const totalEstEl = document.getElementById('total-est-value');
-            if (totalEstEl) totalEstEl.innerText = totalVal.toLocaleString('en-US', {minimumFractionDigits: 2}) + " USDT";
+            if (totalEstEl) totalEstEl.innerText = formatNum(totalVal) + " USDT";
             
             const inventoryValEl = document.getElementById('holding-btc-val');
             if (inventoryValEl) inventoryValEl.innerText = `${Math.abs(btcBalance).toFixed(6)} BTC ${tradingMode === 'futures' && isPositionOpen ? (btcBalance > 0 ? '(LONG)' : '(SHORT)') : ''}`;
@@ -789,10 +787,10 @@
                 if (liqRow) liqRow.classList.remove('hidden'); 
                 if (closeBtn) closeBtn.classList.remove('hidden');
                 if (uPnlEl) {
-                    uPnlEl.innerText = `${unrealizedPnL >= 0 ? '+' : ''}${unrealizedPnL.toFixed(2)} USDT`;
+                    uPnlEl.innerText = `${unrealizedPnL >= 0 ? '+' : ''}${formatNum(unrealizedPnL)} USDT`;
                     uPnlEl.className = `font-bold mono ${unrealizedPnL >= 0 ? 'text-buy' : 'text-sell'}`;
                 }
-                if (liqValEl) liqValEl.innerText = liquidationPrice.toFixed(2) + " USDT";
+                if (liqValEl) liqValEl.innerText = formatNum(liquidationPrice) + " USDT";
             } else { 
                 if (pnlRow) pnlRow.classList.add('hidden'); 
                 if (liqRow) liqRow.classList.add('hidden'); 
@@ -811,13 +809,10 @@
             }
             
             const inputPriceEl = document.getElementById('input-price');
-            if (inputPriceEl && document.activeElement !== inputPriceEl) inputPriceEl.value = currentPrice.toFixed(2);
+            if (inputPriceEl && document.activeElement !== inputPriceEl) inputPriceEl.value = formatNum(currentPrice);
             
             const holdingBtcTicker = document.getElementById('holding-btc');
             if (holdingBtcTicker) holdingBtcTicker.innerText = btcBalance.toFixed(6);
-
-            const summaryBtcLabel = document.getElementById('summary-btc-label');
-            if (summaryBtcLabel) summaryBtcLabel.innerText = tradingMode === 'spot' ? "Total BTC" : "Total Pos BTC";
         }
 
         function updateSliderDots(val) {
@@ -833,7 +828,7 @@
             const inputSizeEl = document.getElementById('input-size');
             const inputPriceEl = document.getElementById('input-price');
             if (!inputSizeEl || currentSliderPct === 0 || document.activeElement === inputSizeEl) return;
-            const price = parseFloat(inputPriceEl.value) || currentPrice;
+            const price = parseFloat(inputPriceEl.value.replace(/,/g, '')) || currentPrice;
             const pct = currentSliderPct / 100;
             if(tradingMode === 'spot') {
                 if(currentMode === 'buy') inputSizeEl.value = ((usdtBalance * (currentSliderPct === 100 ? 1.0 : 0.999)) / price).toFixed(6);
@@ -859,13 +854,14 @@
             if(btcBalance > 0) unrealizedPnL = (currentPrice - entryPrice) * btcBalance;
             else unrealizedPnL = (entryPrice - currentPrice) * Math.abs(btcBalance);
             usdtBalance += unrealizedPnL; btcBalance = 0; entryPrice = 0; liquidationPrice = 0;
-            if(!silent) showAlert(`Closed: ${unrealizedPnL >= 0 ? '+' : ''}${unrealizedPnL.toFixed(2)} USDT`, unrealizedPnL >= 0 ? "#00c087" : "#f84960");
+            if(!silent) showAlert(`Closed: ${unrealizedPnL >= 0 ? '+' : ''}${formatNum(unrealizedPnL)} USDT`, unrealizedPnL >= 0 ? "#00c087" : "#f84960");
             updateUI();
         }
 
         function executeTrade() {
             const inputSizeEl = document.getElementById('input-size'); const inputPriceEl = document.getElementById('input-price');
-            const requestedSize = parseFloat(inputSizeEl.value); const price = parseFloat(inputPriceEl.value) || currentPrice; 
+            const requestedSize = parseFloat(inputSizeEl.value); 
+            const price = parseFloat(inputPriceEl.value.replace(/,/g, '')) || currentPrice; 
             if(currentSliderPct < 1 && (!requestedSize || requestedSize <= 0)) return showAlert("Invalid Amount", "#f84960");
             if(tradingMode === 'spot') {
                 if(currentMode === 'buy') {
@@ -887,15 +883,8 @@
                 if(marginReq > usdtBalance + 0.01) return showAlert("Insufficient Margin", "#f84960");
                 if(btcBalance === 0) entryPrice = price;
                 else entryPrice = ((Math.abs(btcBalance) * entryPrice) + (actualSize * price)) / (Math.abs(btcBalance) + actualSize);
-                
-                if(currentMode === 'buy') {
-                    btcBalance += actualSize;
-                    liquidationPrice = entryPrice * (1 - (1 / leverage));
-                } else {
-                    btcBalance -= actualSize;
-                    liquidationPrice = entryPrice * (1 + (1 / leverage));
-                }
-
+                if(currentMode === 'buy') { btcBalance += actualSize; liquidationPrice = entryPrice * (1 - (1 / leverage)); } 
+                else { btcBalance -= actualSize; liquidationPrice = entryPrice * (1 + (1 / leverage)); }
                 if(currentSliderPct === 100) usdtBalance = 0; else usdtBalance -= marginReq;
                 showAlert(`Position Opened: ${actualSize.toFixed(6)} BTC`, currentMode === 'buy' ? "#00c087" : "#f84960");
             }
