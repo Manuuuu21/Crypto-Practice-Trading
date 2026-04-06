@@ -639,8 +639,10 @@
         }
 
         function initChartData() {
+            let savedCurrentPrice = currentPrice; // Preserve the active price
+
             candles = [];
-            let p = realPrice;
+            let p = savedCurrentPrice;
             for(let i = 0; i < INITIAL_CANDLES; i++) {
                 let open = p;
                 let close = p;
@@ -651,7 +653,7 @@
                 for(let t = 0; t < currentTimeframe; t++) {
                     // Randomly add or decrease between 0.01% to 0.98% per tick
                     const tickVol = (Math.random() * 0.98 + 0.01) / 100;
-                    // Scaled down to ensure the 5-second candle overall magnitude stays realistic
+                    // Scaled down to ensure the overall magnitude stays realistic
                     const scaledVol = tickVol / 2; 
                     
                     // EVERY tick (1 sec) randomly decides if it goes up or down
@@ -665,11 +667,21 @@
                 candles.push({ open, close, high, low });
                 p = close;
             }
+
+            // Adjust all generated historical candles so the last one ends EXACTLY at our preserved current price
+            const ratio = savedCurrentPrice / p;
+            for(let i = 0; i < candles.length; i++) {
+                candles[i].open *= ratio;
+                candles[i].close *= ratio;
+                candles[i].high *= ratio;
+                candles[i].low *= ratio;
+            }
+
             initialPrice = candles[0].open;
-            currentPrice = p;
-            lastPrice = p;
-            sessionHigh = Math.max(...candles.map(c => c.high));
-            sessionLow = Math.min(...candles.map(c => c.low));
+            currentPrice = savedCurrentPrice; // Restore preserved price
+            lastPrice = savedCurrentPrice; // Restore preserved price
+            sessionHigh = Math.max(...candles.map(c => c.high), savedCurrentPrice);
+            sessionLow = Math.min(...candles.map(c => c.low), savedCurrentPrice);
             
             tickSubCount = 0;
         }
