@@ -418,8 +418,6 @@
         let lastMouseX = 0;
 
         let tickSubCount = 0;
-        let currentCandleVol = 0;
-        let currentCandleDir = 1;
         let currentSliderPct = 0; 
 
         // Drawing State
@@ -648,23 +646,21 @@
                 let close = p;
                 let high = p;
                 let low = p;
-                
-                // Fix the volatility change per candle (0.01% to 0.99%)
-                const targetVol = (Math.random() * 0.98 + 0.01) / 100;
-                const dir = Math.random() > 0.5 ? 1 : -1;
-                const baseTickChange = targetVol / currentTimeframe;
 
                 // Realistically simulate ticks to form the historical candle
                 for(let t = 0; t < currentTimeframe; t++) {
-                    const noise = (Math.random() * 0.5) * baseTickChange * (Math.random() > 0.5 ? 1 : -1);
-                    close += close * (baseTickChange * dir + noise);
+                    // Randomly add or decrease between 0.01% to 0.98% per tick
+                    const tickVol = (Math.random() * 0.98 + 0.01) / 100;
+                    // Scaled down to ensure the 5-second candle overall magnitude stays realistic
+                    const scaledVol = tickVol / 2; 
+                    
+                    // EVERY tick (1 sec) randomly decides if it goes up or down
+                    const tickDir = Math.random() > 0.5 ? 1 : -1; 
+                    
+                    close += close * (scaledVol * tickDir);
                     if(close > high) high = close;
                     if(close < low) low = close;
                 }
-                
-                // Add micro wicks to ensure clear visibility
-                high = Math.max(high, Math.max(open, close) * (1 + Math.random() * 0.00005));
-                low = Math.min(low, Math.min(open, close) * (1 - Math.random() * 0.00005));
 
                 candles.push({ open, close, high, low });
                 p = close;
@@ -675,9 +671,6 @@
             sessionHigh = Math.max(...candles.map(c => c.high));
             sessionLow = Math.min(...candles.map(c => c.low));
             
-            // Initialize for the first live candle
-            currentCandleVol = (Math.random() * 0.98 + 0.01) / 100;
-            currentCandleDir = Math.random() > 0.5 ? 1 : -1;
             tickSubCount = 0;
         }
 
@@ -836,17 +829,15 @@
         }
 
         function tick() {
-            if (tickSubCount === 0) {
-                // Fix the volatility change target for the new candle (0.01% up to 0.99%)
-                currentCandleVol = (Math.random() * 0.98 + 0.01) / 100;
-                currentCandleDir = Math.random() > 0.5 ? 1 : -1;
-            }
-
-            // Distribute the target volatility across the ticks of the timeframe
-            const baseTickChange = currentCandleVol / currentTimeframe;
-            const noise = (Math.random() * 0.5) * baseTickChange * (Math.random() > 0.5 ? 1 : -1);
+            // Randomly add or decrease between 0.01% to 0.98% THIS tick
+            const tickVol = (Math.random() * 0.98 + 0.01) / 100;
+            // Scale it so the 5 seconds combined don't explode the chart height
+            const scaledVol = tickVol / 2; 
             
-            const priceChange = currentPrice * (baseTickChange * currentCandleDir + noise);
+            // EVERY SINGLE SECOND, randomly decide to go UP or DOWN
+            const tickDir = Math.random() > 0.5 ? 1 : -1; 
+            
+            const priceChange = currentPrice * (scaledVol * tickDir);
             
             lastPrice = currentPrice; 
             currentPrice += priceChange;
@@ -858,6 +849,9 @@
 
             let currentCandle = candles[candles.length - 1];
             currentCandle.close = currentPrice;
+            
+            // Dynamically update the high/low of the candle. 
+            // Because price can flip-flop randomly inside the 5 seconds, this creates real wicks automatically!
             if(currentPrice > currentCandle.high) currentCandle.high = currentPrice;
             if(currentPrice < currentCandle.low) currentCandle.low = currentPrice;
             
@@ -904,9 +898,19 @@
                 const c = candles[i];
                 const x = getX(i, s); 
                 const isUp = c.close >= c.open; const color = isUp ? '#00c087' : '#f84960';
-                ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = Math.max(1, candleWidth * 0.2);
-                ctx.beginPath(); ctx.moveTo(x, getY(c.high, s)); ctx.lineTo(x, getY(c.low, s)); ctx.stroke();
-                const bTop = getY(Math.max(c.open, c.close), s); const bBot = getY(Math.min(c.open, c.close), s);
+                
+                // --- Draw Wick ---
+                ctx.strokeStyle = color; 
+                ctx.lineWidth = Math.max(1, candleWidth * 0.15); // Clear, visible wick
+                ctx.beginPath(); 
+                ctx.moveTo(x, getY(c.high, s)); 
+                ctx.lineTo(x, getY(c.low, s)); 
+                ctx.stroke();
+                
+                // --- Draw Body ---
+                const bTop = getY(Math.max(c.open, c.close), s); 
+                const bBot = getY(Math.min(c.open, c.close), s);
+                ctx.fillStyle = color;
                 ctx.fillRect(x - candleWidth/2, bTop, Math.max(1, candleWidth), Math.max(1, bBot - bTop));
             }
 
