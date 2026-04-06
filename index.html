@@ -223,7 +223,7 @@
         </div>
     </div>
 
-    <!-- Main Workspace (Responsive vertical stacking on mobile) -->
+    <!-- Main Workspace -->
     <main class="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden no-scrollbar bg-[#0b0e11]">
         
         <!-- Left Section: Chart -->
@@ -252,7 +252,6 @@
                 <div id="chart-tooltip"></div>
                 
                 <canvas id="trading-chart"></canvas>
-                <!-- Updated Price Label element -->
                 <div id="chart-price-label">45,905.30</div>
             </div>
         </div>
@@ -382,7 +381,7 @@
         </div>
     </main>
 
-    <!-- Alert (Bottom Left) -->
+    <!-- Alert -->
     <div id="custom-alert" class="fixed bottom-6 left-6 z-50 transform -translate-x-80 opacity-0 transition-all duration-300">
         <div class="bg-[#1e2329] border border-gray-custom text-white px-5 py-3 rounded shadow-2xl flex items-center space-x-3 min-w-[240px]">
             <div id="alert-dot" class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></div>
@@ -405,14 +404,16 @@
         let tradingMode = 'spot'; 
         let leverage = 20;
         let entryPrice = 0; 
+        let spotEntryPrice = 0; 
         let liquidationPrice = 0;
-        
+        let marginUsed = 0; // NEW: Track margin locked in trade to correctly handle liquidation
+
         let candles = [];
         const MAX_CANDLES = 10000;
-        const INITIAL_CANDLES = 100; // Increased to 500 so you have a long history off the bat
+        const INITIAL_CANDLES = 100;
         
         let currentTimeframe = 5;
-        let visibleCandlesCount = INITIAL_CANDLES; // Zoom out to the max initially
+        let visibleCandlesCount = INITIAL_CANDLES;
         let panOffset = 0;
         let isPanning = false;
         let lastMouseX = 0;
@@ -420,7 +421,6 @@
         let tickSubCount = 0;
         let currentSliderPct = 0; 
 
-        // Drawing State
         let drawings = []; 
         let isDrawingMode = false;
         let isDrawing = false;
@@ -432,7 +432,6 @@
         const container = document.getElementById('chart-container');
         const tooltip = document.getElementById('chart-tooltip');
 
-        // Helper for formatting with commas
         function formatNum(num, decimals = 2) {
             return num.toLocaleString('en-US', {
                 minimumFractionDigits: decimals,
@@ -440,7 +439,6 @@
             });
         }
 
-        // Helper for mouse/touch coordinates
         function getCoords(e) {
             if (e.changedTouches && e.changedTouches.length > 0) {
                 return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
@@ -450,7 +448,6 @@
             return { x: e.clientX, y: e.clientY };
         }
 
-        // --- INIT ---
         window.onload = () => {
             initChartData();
             resizeCanvas();
@@ -459,18 +456,15 @@
             setInterval(tick, 1000); 
             window.addEventListener('resize', resizeCanvas);
 
-            // Zoom via Wheel
             canvas.addEventListener('wheel', (e) => {
                 e.preventDefault();
                 const zoomSensitivity = 0.05;
                 if (e.deltaY > 0) visibleCandlesCount *= (1 + zoomSensitivity);
                 else visibleCandlesCount *= (1 - zoomSensitivity);
-                
                 visibleCandlesCount = Math.max(10, Math.min(candles.length, visibleCandlesCount));
                 drawChart();
             }, { passive: false });
 
-            // Mouse Listeners
             canvas.addEventListener('mousedown', handleMouseDown);
             canvas.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('mouseup', handleMouseUp);
@@ -482,13 +476,12 @@
                 if (isDrawingMode) drawChart(); 
             });
 
-            // Touch Listeners (Mobile interactivity)
             canvas.addEventListener('touchstart', (e) => {
                 if(e.touches.length === 1) handleMouseDown(e);
             }, { passive: false });
             canvas.addEventListener('touchmove', (e) => {
                 if(e.touches.length === 1) {
-                    e.preventDefault(); // Stop window scrolling while panning chart
+                    e.preventDefault();
                     handleMouseMove(e);
                 }
             }, { passive: false });
@@ -523,28 +516,23 @@
         };
 
         function resetApp() {
-            // Reset balances & positions
             usdtBalance = INITIAL_TOTAL_BALANCE;
             btcBalance = 0;
             entryPrice = 0;
+            spotEntryPrice = 0;
             liquidationPrice = 0;
-            
-            // Remove drawings only (maintain chart candles, pan, and zoom)
+            marginUsed = 0;
             drawings = [];
-
-            // Reset Trade Form to defaults but maintain current trading mode
             setTradingMode(tradingMode);
             const levInput = document.getElementById('leverage-input');
             if(levInput) levInput.value = "20";
             leverage = 20;
-
             const inputSizeEl = document.getElementById('input-size');
             if (inputSizeEl) inputSizeEl.value = "";
             const ruler = document.getElementById('money-ruler');
             if (ruler) ruler.value = 0;
             currentSliderPct = 0;
             updateSliderDots(0);
-            
             updateUI();
             drawChart();
             showAlert("Account Reset to 1,000 USDT", "#F3BA2F");
@@ -568,7 +556,7 @@
                 if (btnFutures) btnFutures.className = "px-3 md:px-4 py-1 rounded text-[10px] font-bold uppercase transition-all text-gray-500 hover:text-gray-300";
                 if (tickerBadge) tickerBadge.innerText = "Spot";
                 if (levSelector) levSelector.classList.add('hidden');
-                if (btcBalance !== 0) closePosition(true);
+                if (btcBalance !== 0 && entryPrice !== 0) closePosition(true); 
             } else {
                 if (btnFutures) btnFutures.className = "px-3 md:px-4 py-1 rounded text-[10px] font-bold uppercase transition-all bg-yellow-400 text-black";
                 if (btnSpot) btnSpot.className = "px-3 md:px-4 py-1 rounded text-[10px] font-bold uppercase transition-all text-gray-500 hover:text-gray-300";
@@ -626,21 +614,17 @@
             });
             const volInfo = document.getElementById('volatility-info');
             if (volInfo) volInfo.innerText = `${seconds}s Candle Closure`;
-            
             tickSubCount = 0;
             drawings = [];
             panOffset = 0;
-            visibleCandlesCount = INITIAL_CANDLES; // Reset zoom to farthest
-            
-            // Rebuild history realistically for the newly selected timeframe
+            visibleCandlesCount = INITIAL_CANDLES;
             initChartData();
             updateUI();
             drawChart();
         }
 
         function initChartData() {
-            let savedCurrentPrice = currentPrice; // Preserve the active price
-
+            let savedCurrentPrice = currentPrice;
             candles = [];
             let p = savedCurrentPrice;
             for(let i = 0; i < INITIAL_CANDLES; i++) {
@@ -648,27 +632,17 @@
                 let close = p;
                 let high = p;
                 let low = p;
-
-                // Realistically simulate ticks to form the historical candle
                 for(let t = 0; t < currentTimeframe; t++) {
-                    // Randomly add or decrease between 0.01% to 0.98% per tick
                     const tickVol = (Math.random() * 0.98 + 0.01) / 100;
-                    // Scaled down to ensure the overall magnitude stays realistic
                     const scaledVol = tickVol / 2; 
-                    
-                    // EVERY tick (1 sec) randomly decides if it goes up or down
                     const tickDir = Math.random() > 0.5 ? 1 : -1; 
-                    
                     close += close * (scaledVol * tickDir);
                     if(close > high) high = close;
                     if(close < low) low = close;
                 }
-
                 candles.push({ open, close, high, low });
                 p = close;
             }
-
-            // Adjust all generated historical candles so the last one ends EXACTLY at our preserved current price
             const ratio = savedCurrentPrice / p;
             for(let i = 0; i < candles.length; i++) {
                 candles[i].open *= ratio;
@@ -676,13 +650,11 @@
                 candles[i].high *= ratio;
                 candles[i].low *= ratio;
             }
-
             initialPrice = candles[0].open;
-            currentPrice = savedCurrentPrice; // Restore preserved price
-            lastPrice = savedCurrentPrice; // Restore preserved price
+            currentPrice = savedCurrentPrice;
+            lastPrice = savedCurrentPrice;
             sessionHigh = Math.max(...candles.map(c => c.high), savedCurrentPrice);
             sessionLow = Math.min(...candles.map(c => c.low), savedCurrentPrice);
-            
             tickSubCount = 0;
         }
 
@@ -691,39 +663,30 @@
             const h = canvas.height;
             const w = canvas.width;
             const chartH = h - padding * 2;
-            const chartW = w - 120; // Increased from 80 to 120 to create more spacing on the right
-            
+            const chartW = w - 120; 
             const maxPan = Math.max(0, candles.length - Math.floor(visibleCandlesCount));
             panOffset = Math.max(0, Math.min(maxPan, panOffset));
-            
             const windowStartIdx = candles.length - visibleCandlesCount - panOffset;
-            
             const startIndex = Math.max(0, Math.floor(windowStartIdx));
             const endIndex = Math.min(candles.length - 1, Math.ceil(windowStartIdx + visibleCandlesCount));
-            
             const visibleCandles = candles.slice(startIndex, endIndex + 1);
-            
             let minP = realPrice;
             let maxP = realPrice;
             if (visibleCandles.length > 0) {
                 minP = Math.min(...visibleCandles.map(c => c.low));
                 maxP = Math.max(...visibleCandles.map(c => c.high));
             }
-            
             const yPadding = (maxP - minP) * 0.1;
             let finalMinP = minP === maxP ? minP - 100 : minP - yPadding;
             let finalMaxP = minP === maxP ? maxP + 100 : maxP + yPadding;
             let range = finalMaxP - finalMinP || 1;
-
-            // PREVENT EXTREME AUTO-SCALING (Fix for tiny volatility making huge candles)
-            const minVisualRange = currentPrice * 0.002; // Enforce at least 0.2% price range visually
+            const minVisualRange = currentPrice * 0.002;
             if (range < minVisualRange) {
                 const midPrice = (finalMaxP + finalMinP) / 2;
                 finalMinP = midPrice - (minVisualRange / 2);
                 finalMaxP = midPrice + (minVisualRange / 2);
                 range = minVisualRange;
             }
-
             return { h, w, padding, chartH, chartW, minP: finalMinP, maxP: finalMaxP, range, windowStartIdx };
         }
 
@@ -744,7 +707,6 @@
         function handleMouseDown(e) {
             const rect = canvas.getBoundingClientRect();
             const coords = getCoords(e);
-            
             if (isDrawingMode) {
                 drawingStart = { x: coords.x - rect.left, y: coords.y - rect.top };
                 isDrawing = true;
@@ -761,22 +723,17 @@
             const mouseX = coords.x - rect.left;
             const mouseY = coords.y - rect.top;
             const scale = getChartScale();
-
             if (isPanning && !isDrawingMode) {
                 const deltaX = coords.x - lastMouseX;
                 const candleWidthPx = scale.chartW / visibleCandlesCount;
                 panOffset += deltaX / candleWidthPx;
-                
                 const maxPan = Math.max(0, candles.length - visibleCandlesCount);
                 panOffset = Math.max(0, Math.min(maxPan, panOffset));
-                
                 lastMouseX = coords.x;
                 drawChart();
                 return;
             }
-
             if (isDrawing) { drawingCurrent = { x: mouseX, y: mouseY }; drawChart(); return; }
-            
             const index = getIndexAtX(mouseX, scale);
             if (index >= 0 && index < candles.length) {
                 const c = candles[index];
@@ -795,7 +752,6 @@
                         <span class="mono font-bold ${pct >= 0 ? 'text-buy' : 'text-sell'}">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</span>
                     </div>
                 `;
-                // Flip tooltip to left if it clips screen width
                 if (mouseX + 160 > canvas.width) tooltip.style.left = (mouseX - 150) + 'px';
             } else { tooltip.style.display = 'none'; }
         }
@@ -829,44 +785,43 @@
 
         function checkLiquidation() {
             if (tradingMode !== 'futures' || btcBalance === 0) return false;
+            
+            // Refined Check: Equity = Available + Locked Margin + PnL
+            let unrealizedPnL = 0;
+            if(btcBalance > 0) unrealizedPnL = (currentPrice - entryPrice) * btcBalance;
+            else unrealizedPnL = (entryPrice - currentPrice) * Math.abs(btcBalance);
+            
+            const totalEquity = usdtBalance + marginUsed + unrealizedPnL;
+            
+            // Liquidate if total account equity reaches 0
+            if (totalEquity <= 0) return true;
+
+            // Direct check against liq price (backup)
             if (btcBalance > 0 && currentPrice <= liquidationPrice) return true;
             if (btcBalance < 0 && currentPrice >= liquidationPrice) return true;
             return false;
         }
 
         function triggerLiquidation() {
-            btcBalance = 0; entryPrice = 0; liquidationPrice = 0; usdtBalance = 0; 
+            btcBalance = 0; entryPrice = 0; liquidationPrice = 0; usdtBalance = 0; marginUsed = 0;
             showAlert("LIQUIDATED! Position forced closed at 0 margin.", "#f84960");
             updateUI();
         }
 
         function tick() {
-            // Randomly add or decrease between 0.01% to 0.98% THIS tick
             const tickVol = (Math.random() * 0.98 + 0.01) / 100;
-            // Scale it so the 5 seconds combined don't explode the chart height
             const scaledVol = tickVol / 2; 
-            
-            // EVERY SINGLE SECOND, randomly decide to go UP or DOWN
             const tickDir = Math.random() > 0.5 ? 1 : -1; 
-            
             const priceChange = currentPrice * (scaledVol * tickDir);
-            
             lastPrice = currentPrice; 
             currentPrice += priceChange;
-            
             if (currentPrice > sessionHigh) sessionHigh = currentPrice;
             if (currentPrice < sessionLow) sessionLow = currentPrice;
-
             if (checkLiquidation()) { triggerLiquidation(); return; }
-
             let currentCandle = candles[candles.length - 1];
             currentCandle.close = currentPrice;
-            
-            // Dynamically update the high/low of the candle. 
-            // Because price can flip-flop randomly inside the 5 seconds, this creates real wicks automatically!
             if(currentPrice > currentCandle.high) currentCandle.high = currentPrice;
             if(currentPrice < currentCandle.low) currentCandle.low = currentPrice;
-            
             tickSubCount++;
             if (tickSubCount >= currentTimeframe) {
                 tickSubCount = 0;
@@ -883,50 +838,36 @@
         function drawChart() {
             if (!canvas || !canvas.width) return;
             const s = getChartScale(); ctx.clearRect(0, 0, s.w, s.h);
-            
-            // Draw Vertical Gutter Line - pushed further right for better separation
             const gutterOffset = 35;
             ctx.strokeStyle = '#2b3139'; ctx.lineWidth = 1;
             ctx.beginPath(); ctx.moveTo(s.chartW + gutterOffset, 0); ctx.lineTo(s.chartW + gutterOffset, s.h); ctx.stroke();
-
-            // Background Grid & Static Price Labels
             ctx.strokeStyle = '#1e2329'; ctx.setLineDash([4, 4]); ctx.lineWidth = 0.5;
             ctx.fillStyle = '#474d57'; ctx.font = '10px JetBrains Mono';
             for(let i = 0; i <= 5; i++) {
                 let price = s.minP + (s.range / 5) * i;
                 let py = getY(price, s);
                 ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(s.chartW + gutterOffset, py); ctx.stroke();
-                // Increased spacing for static labels
                 ctx.fillText(formatNum(price, 0), s.chartW + gutterOffset + 10, py + 3);
             }
             ctx.setLineDash([]);
-
-            // Draw Candles
             const candleWidth = (s.chartW / visibleCandlesCount) * 0.6;
             const startI = Math.max(0, Math.floor(s.windowStartIdx));
             const endI = Math.min(candles.length - 1, Math.ceil(s.windowStartIdx + visibleCandlesCount));
-            
             for(let i = startI; i <= endI; i++) {
                 const c = candles[i];
                 const x = getX(i, s); 
                 const isUp = c.close >= c.open; const color = isUp ? '#00c087' : '#f84960';
-                
-                // --- Draw Wick ---
                 ctx.strokeStyle = color; 
-                ctx.lineWidth = Math.max(1, candleWidth * 0.15); // Clear, visible wick
+                ctx.lineWidth = Math.max(1, candleWidth * 0.15);
                 ctx.beginPath(); 
                 ctx.moveTo(x, getY(c.high, s)); 
                 ctx.lineTo(x, getY(c.low, s)); 
                 ctx.stroke();
-                
-                // --- Draw Body ---
                 const bTop = getY(Math.max(c.open, c.close), s); 
                 const bBot = getY(Math.min(c.open, c.close), s);
                 ctx.fillStyle = color;
                 ctx.fillRect(x - candleWidth/2, bTop, Math.max(1, candleWidth), Math.max(1, bBot - bTop));
             }
-
-            // Draw current price dashed line 
             const py = getY(currentPrice, s);
             ctx.setLineDash([4, 4]);
             ctx.strokeStyle = currentPrice >= lastPrice ? 'rgba(0, 192, 135, 0.5)' : 'rgba(248, 73, 96, 0.5)';
@@ -936,8 +877,6 @@
             ctx.lineTo(s.chartW + gutterOffset, py);
             ctx.stroke();
             ctx.setLineDash([]);
-
-            // Drawings
             ctx.lineWidth = 2; ctx.strokeStyle = '#f3ba2f';
             drawings.forEach(d => {
                 ctx.beginPath(); ctx.moveTo(getX(d.startIdx, s), getY(d.startPrice, s));
@@ -948,39 +887,41 @@
                 ctx.moveTo(drawingStart.x, drawingStart.y); ctx.lineTo(drawingCurrent.x, drawingCurrent.y); ctx.stroke();
             }
 
-            // Futures Position & Liq Lines - Adjusted spacing to avoid candle overlap
-            if (tradingMode === 'futures' && btcBalance !== 0) {
-                // Entry Line
-                const entryY = getY(entryPrice, s);
-                if (entryY >= 0 && entryY <= s.h) {
-                    ctx.setLineDash([5, 5]); ctx.strokeStyle = btcBalance > 0 ? 'rgba(0, 192, 135, 0.8)' : 'rgba(248, 73, 96, 0.8)'; ctx.lineWidth = 1.5;
-                    ctx.beginPath(); ctx.moveTo(0, entryY); ctx.lineTo(s.chartW + gutterOffset, entryY); ctx.stroke();
-                    ctx.setLineDash([]); ctx.fillStyle = btcBalance > 0 ? '#00c087' : '#f84960'; ctx.font = 'bold 9px Inter';
-                    ctx.fillText('ENTRY: ' + formatNum(entryPrice), s.chartW - 90, entryY - 5);
+            // Spot Entry Line
+            if (tradingMode === 'spot' && btcBalance > 0) {
+                const sEntryY = getY(spotEntryPrice, s);
+                if (sEntryY >= 0 && sEntryY <= s.h) {
+                    ctx.setLineDash([3, 6]); ctx.strokeStyle = '#f3ba2f'; ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(0, sEntryY); ctx.lineTo(s.chartW + gutterOffset, sEntryY); ctx.stroke();
+                    ctx.setLineDash([]); ctx.fillStyle = '#f3ba2f'; ctx.font = 'bold 9px Inter';
+                    ctx.fillText('SPOT AVG: ' + formatNum(spotEntryPrice), s.chartW - 90, sEntryY - 5);
                 }
+            }
 
-                // Liquidation Line (Clamped to screen so it's always visible)
+            // Futures Lines
+            if (tradingMode === 'futures' && btcBalance !== 0) {
+                const fEntryY = getY(entryPrice, s);
+                if (fEntryY >= 0 && fEntryY <= s.h) {
+                    ctx.setLineDash([5, 5]); ctx.strokeStyle = btcBalance > 0 ? 'rgba(0, 192, 135, 0.8)' : 'rgba(248, 73, 96, 0.8)'; ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.moveTo(0, fEntryY); ctx.lineTo(s.chartW + gutterOffset, fEntryY); ctx.stroke();
+                    ctx.setLineDash([]); ctx.fillStyle = btcBalance > 0 ? '#00c087' : '#f84960'; ctx.font = 'bold 9px Inter';
+                    ctx.fillText('FUT. ENTRY: ' + formatNum(entryPrice), s.chartW - 90, fEntryY - 5);
+                }
                 let liqYRaw = getY(liquidationPrice, s);
                 const isOffscreenBottom = liqYRaw > s.h;
                 const isOffscreenTop = liqYRaw < 0;
-                
-                const liqY = Math.max(15, Math.min(s.h - 15, liqYRaw)); // Clamp inside canvas height
-                
+                const liqY = Math.max(15, Math.min(s.h - 15, liqYRaw));
                 ctx.setLineDash([8, 4]); ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 1.5;
                 ctx.beginPath(); ctx.moveTo(0, liqY); ctx.lineTo(s.chartW + gutterOffset, liqY); ctx.stroke();
                 ctx.setLineDash([]); ctx.fillStyle = '#3b82f6'; ctx.font = 'bold 9px Inter';
-                
                 let liqText = 'LIQ: ' + formatNum(liquidationPrice);
                 if (isOffscreenBottom) liqText += ' ↓';
                 if (isOffscreenTop) liqText += ' ↑';
-                
                 ctx.fillText(liqText, s.chartW - 90, liqY > 15 ? liqY - 5 : liqY + 12);
             }
-
-            // Update DOM Price Label (the colored badge in the gutter)
             const label = document.getElementById('chart-price-label');
             if (label) {
-                label.style.top = `${py - 12}px`; // Center vertically
+                label.style.top = `${py - 12}px`;
                 label.innerText = formatNum(currentPrice);
                 label.style.backgroundColor = currentPrice >= lastPrice ? '#00c087' : '#f84960';
                 label.style.color = '#000';
@@ -1010,44 +951,34 @@
             else {
                 if(btcBalance > 0) unrealizedPnL = (currentPrice - entryPrice) * btcBalance;
                 else if(btcBalance < 0) unrealizedPnL = (entryPrice - currentPrice) * Math.abs(btcBalance);
-                totalVal = usdtBalance + unrealizedPnL;
+                totalVal = usdtBalance + marginUsed + unrealizedPnL;
             }
             const totalPnlPct = (((totalVal / INITIAL_TOTAL_BALANCE) - 1) * 100).toFixed(2);
-            
-            // Calculate 24h Change (Current vs Initial price)
             const changePct = ((currentPrice - initialPrice) / initialPrice) * 100;
             const tickerChangeEl = document.getElementById('ticker-change');
             if (tickerChangeEl) {
                 tickerChangeEl.innerText = `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`;
                 tickerChangeEl.className = `mono font-bold ${changePct >= 0 ? 'text-buy' : 'text-sell'}`;
             }
-
             const tickerPriceEl = document.getElementById('ticker-price');
             if (tickerPriceEl) {
                 tickerPriceEl.innerText = formatNum(currentPrice);
                 tickerPriceEl.className = `font-bold mono text-sm ${currentPrice >= lastPrice ? 'text-buy' : 'text-sell'}`;
             }
-            
             const tickerHighEl = document.getElementById('ticker-high');
             if (tickerHighEl) tickerHighEl.innerText = formatNum(sessionHigh);
-
             const tickerLowEl = document.getElementById('ticker-low');
             if (tickerLowEl) tickerLowEl.innerText = formatNum(sessionLow);
-            
             const walletHeaderEl = document.getElementById('wallet-balance-header');
             if (walletHeaderEl) walletHeaderEl.innerText = formatNum(totalVal);
-            
             const availUsdtEl = document.getElementById('available-usdt');
             if (availUsdtEl) availUsdtEl.innerText = formatNum(usdtBalance);
-            
             const availBtcEl = document.getElementById('available-btc');
             if (availBtcEl) availBtcEl.innerText = btcBalance.toFixed(8);
-            
             const maxPossibleValEl = document.getElementById('max-possible-val');
             const maxPossibleLabelEl = document.getElementById('max-possible-label');
             const availFundText = document.getElementById('avail-fund-text');
             const availFundsLabelEl = document.getElementById('available-funds-label');
-            
             if(tradingMode === 'spot') {
                 const max = (currentMode === 'buy' ? usdtBalance / currentPrice : btcBalance);
                 if (maxPossibleValEl) maxPossibleValEl.innerText = max.toFixed(6) + " BTC";
@@ -1055,26 +986,22 @@
                 if (availFundText) availFundText.innerText = "Available";
                 if (availFundsLabelEl) availFundsLabelEl.innerText = currentMode === 'buy' ? formatNum(usdtBalance) + " USDT" : btcBalance.toFixed(6) + " BTC";
             } else {
-                const buyingPower = usdtBalance * leverage;
+                const buyingPower = (usdtBalance + marginUsed) * leverage;
                 const max = buyingPower / currentPrice;
                 if (maxPossibleValEl) maxPossibleValEl.innerText = max.toFixed(6) + " BTC";
                 if (maxPossibleLabelEl) maxPossibleLabelEl.innerText = "Max Buying Power";
                 if (availFundText) availFundText.innerText = "Avbl Margin";
                 if (availFundsLabelEl) availFundsLabelEl.innerText = formatNum(usdtBalance) + " USDT";
             }
-
             const totalEstEl = document.getElementById('total-est-value');
             if (totalEstEl) totalEstEl.innerText = formatNum(totalVal) + " USDT";
-            
             const inventoryValEl = document.getElementById('holding-btc-val');
             if (inventoryValEl) inventoryValEl.innerText = `${Math.abs(btcBalance).toFixed(6)} BTC ${tradingMode === 'futures' && isPositionOpen ? (btcBalance > 0 ? '(LONG)' : '(SHORT)') : ''}`;
-            
             const pnlRow = document.getElementById('unrealized-pnl-row');
             const liqRow = document.getElementById('liq-price-row');
             const closeBtn = document.getElementById('btn-close-position');
             const uPnlEl = document.getElementById('unrealized-pnl');
             const liqValEl = document.getElementById('liq-price-val');
-            
             if(tradingMode === 'futures' && isPositionOpen) {
                 if (pnlRow) pnlRow.classList.remove('hidden'); 
                 if (liqRow) liqRow.classList.remove('hidden'); 
@@ -1089,21 +1016,17 @@
                 if (liqRow) liqRow.classList.add('hidden'); 
                 if (closeBtn) closeBtn.classList.add('hidden'); 
             }
-
             const pnlPctEl = document.getElementById('portfolio-pnl-pct');
             if (pnlPctEl) {
                 let displayPct = totalPnlPct;
                 if(tradingMode === 'futures' && isPositionOpen) {
-                    const marginUsed = (Math.abs(btcBalance) * entryPrice) / leverage;
                     displayPct = ((unrealizedPnL / marginUsed) * 100).toFixed(2);
                 }
                 pnlPctEl.innerText = `${displayPct >= 0 ? '+' : ''}${displayPct}%`;
                 pnlPctEl.className = `font-bold mono ${displayPct >= 0 ? 'text-buy' : 'text-sell'}`;
             }
-            
             const inputPriceEl = document.getElementById('input-price');
             if (inputPriceEl && document.activeElement !== inputPriceEl) inputPriceEl.value = formatNum(currentPrice);
-            
             const holdingBtcTicker = document.getElementById('holding-btc');
             if (holdingBtcTicker) holdingBtcTicker.innerText = btcBalance.toFixed(6);
         }
@@ -1127,7 +1050,7 @@
                 if(currentMode === 'buy') inputSizeEl.value = ((usdtBalance * (currentSliderPct === 100 ? 1.0 : 0.999)) / price).toFixed(6);
                 else inputSizeEl.value = (btcBalance * pct).toFixed(6);
             } else {
-                const buyingPower = usdtBalance * leverage;
+                const buyingPower = (usdtBalance + marginUsed) * leverage;
                 inputSizeEl.value = ((buyingPower * pct * (currentSliderPct === 100 ? 1.0 : 0.999)) / price).toFixed(6);
             }
         }
@@ -1143,11 +1066,18 @@
 
         function closePosition(silent = false) {
             if(btcBalance === 0) return;
-            let unrealizedPnL = 0;
-            if(btcBalance > 0) unrealizedPnL = (currentPrice - entryPrice) * btcBalance;
-            else unrealizedPnL = (entryPrice - currentPrice) * Math.abs(btcBalance);
-            usdtBalance += unrealizedPnL; btcBalance = 0; entryPrice = 0; liquidationPrice = 0;
-            if(!silent) showAlert(`Closed: ${unrealizedPnL >= 0 ? '+' : ''}${formatNum(unrealizedPnL)} USDT`, unrealizedPnL >= 0 ? "#00c087" : "#f84960");
+            let pnl = 0;
+            if(tradingMode === 'spot') {
+                pnl = (btcBalance * currentPrice) - (btcBalance * spotEntryPrice);
+                usdtBalance += (btcBalance * currentPrice);
+                btcBalance = 0; spotEntryPrice = 0;
+            } else {
+                if(btcBalance > 0) pnl = (currentPrice - entryPrice) * btcBalance;
+                else pnl = (entryPrice - currentPrice) * Math.abs(btcBalance);
+                usdtBalance += (marginUsed + pnl); 
+                btcBalance = 0; entryPrice = 0; liquidationPrice = 0; marginUsed = 0;
+            }
+            if(!silent) showAlert(`Closed: ${pnl >= 0 ? '+' : ''}${formatNum(pnl)} USDT`, pnl >= 0 ? "#00c087" : "#f84960");
             updateUI();
         }
 
@@ -1156,29 +1086,55 @@
             const requestedSize = parseFloat(inputSizeEl.value); 
             const price = parseFloat(inputPriceEl.value.replace(/,/g, '')) || currentPrice; 
             if(currentSliderPct < 1 && (!requestedSize || requestedSize <= 0)) return showAlert("Invalid Amount", "#f84960");
+            
             if(tradingMode === 'spot') {
                 if(currentMode === 'buy') {
                     const actualSize = (currentSliderPct === 100) ? (usdtBalance / price) : requestedSize;
                     const cost = actualSize * price;
                     if(cost > usdtBalance + 0.01) return showAlert("Insufficient Balance", "#f84960");
-                    btcBalance += actualSize; usdtBalance = Math.max(0, usdtBalance - cost);
+                    spotEntryPrice = ((btcBalance * spotEntryPrice) + (actualSize * price)) / (btcBalance + actualSize);
+                    btcBalance += actualSize; 
+                    usdtBalance = Math.max(0, usdtBalance - cost);
                     showAlert(`Bought ${actualSize.toFixed(6)} BTC`, "#00c087");
                 } else {
                     const actualSize = (currentSliderPct === 100) ? btcBalance : requestedSize;
                     if (actualSize > btcBalance + 0.000001 || actualSize <= 0) return showAlert("Insufficient BTC", "#f84960");
-                    btcBalance = Math.max(0, btcBalance - actualSize); usdtBalance += (actualSize * price);
+                    btcBalance = Math.max(0, btcBalance - actualSize); 
+                    if(btcBalance === 0) spotEntryPrice = 0;
+                    usdtBalance += (actualSize * price);
                     showAlert(`Sold ${actualSize.toFixed(6)} BTC`, "#00c087");
                 }
             } else {
                 if((currentMode === 'buy' && btcBalance < 0) || (currentMode === 'sell' && btcBalance > 0)) { closePosition(); return showAlert("Position closed first", "#F3BA2F"); }
-                const actualSize = (currentSliderPct === 100) ? (usdtBalance * leverage / price) : requestedSize;
+                const buyingPower = (usdtBalance + marginUsed) * leverage;
+                const actualSize = (currentSliderPct === 100) ? (buyingPower / price) : requestedSize;
                 const marginReq = (actualSize * price) / leverage; 
-                if(marginReq > usdtBalance + 0.01) return showAlert("Insufficient Margin", "#f84960");
-                if(btcBalance === 0) entryPrice = price;
-                else entryPrice = ((Math.abs(btcBalance) * entryPrice) + (actualSize * price)) / (Math.abs(btcBalance) + actualSize);
-                if(currentMode === 'buy') { btcBalance += actualSize; liquidationPrice = entryPrice * (1 - (1 / leverage)); } 
-                else { btcBalance -= actualSize; liquidationPrice = entryPrice * (1 + (1 / leverage)); }
-                if(currentSliderPct === 100) usdtBalance = 0; else usdtBalance -= marginReq;
+                
+                if(marginReq > (usdtBalance + marginUsed) + 0.01) return showAlert("Insufficient Margin", "#f84960");
+                
+                if(btcBalance === 0) {
+                    entryPrice = price;
+                    marginUsed = marginReq;
+                    usdtBalance -= marginReq;
+                } else {
+                    const totalCost = (Math.abs(btcBalance) * entryPrice) + (actualSize * price);
+                    const totalSize = Math.abs(btcBalance) + actualSize;
+                    entryPrice = totalCost / totalSize;
+                    marginUsed += marginReq;
+                    usdtBalance -= marginReq;
+                }
+
+                // Recalculate Liquidation Price based on TOTAL account equity (isolated + available)
+                const totalCollateral = usdtBalance + marginUsed;
+                if(currentMode === 'buy') { 
+                    btcBalance += actualSize; 
+                    liquidationPrice = entryPrice - (totalCollateral / btcBalance);
+                } 
+                else { 
+                    btcBalance -= actualSize; 
+                    liquidationPrice = entryPrice + (totalCollateral / Math.abs(btcBalance));
+                }
+                
                 showAlert(`Position Opened: ${actualSize.toFixed(6)} BTC`, currentMode === 'buy' ? "#00c087" : "#f84960");
             }
             inputSizeEl.value = ""; document.getElementById('money-ruler').value = 0; currentSliderPct = 0; updateSliderDots(0); updateUI();
