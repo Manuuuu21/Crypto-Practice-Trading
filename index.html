@@ -406,7 +406,7 @@
         let entryPrice = 0; 
         let spotEntryPrice = 0; 
         let liquidationPrice = 0;
-        let marginUsed = 0; // NEW: Track margin locked in trade to correctly handle liquidation
+        let marginUsed = 0; 
 
         let candles = [];
         const MAX_CANDLES = 10000;
@@ -417,6 +417,7 @@
         let panOffset = 0;
         let isPanning = false;
         let lastMouseX = 0;
+        let hoverIndex = null; // NEW: Track which candle index is being hovered for the crosshair
 
         let tickSubCount = 0;
         let currentSliderPct = 0; 
@@ -470,10 +471,11 @@
             window.addEventListener('mouseup', handleMouseUp);
             canvas.addEventListener('mouseleave', () => {
                 tooltip.style.display = 'none';
+                hoverIndex = null; // Clear crosshair on leave
                 drawingCurrent = null;
                 isPanning = false;
                 canvas.style.cursor = 'crosshair';
-                if (isDrawingMode) drawChart(); 
+                drawChart(); // Redraw to remove crosshair
             });
 
             canvas.addEventListener('touchstart', (e) => {
@@ -522,7 +524,6 @@
             spotEntryPrice = 0;
             liquidationPrice = 0;
             marginUsed = 0;
-            // drawings = []; // REMOVED: Drawings are no longer cleared on app reset
             setTradingMode(tradingMode);
             const levInput = document.getElementById('leverage-input');
             if(levInput) levInput.value = levInput.value;
@@ -534,7 +535,6 @@
             currentSliderPct = 0;
             updateSliderDots(0);
             
-            // Also reset session high/low for a full app reset
             sessionHigh = currentPrice;
             sessionLow = currentPrice;
             
@@ -624,7 +624,6 @@
             panOffset = 0;
             visibleCandlesCount = INITIAL_CANDLES;
             
-            // Pass true to maintain current 24h High/Low during timeframe switch
             initChartData(true);
             
             updateUI();
@@ -664,7 +663,6 @@
             currentPrice = savedCurrentPrice;
             lastPrice = savedCurrentPrice;
             
-            // Only update sessionHigh and sessionLow if we are not instructed to keep them
             if (!keepHighLow) {
                 sessionHigh = Math.max(...candles.map(c => c.high), savedCurrentPrice);
                 sessionLow = Math.min(...candles.map(c => c.low), savedCurrentPrice);
@@ -686,7 +684,6 @@
             const endIndex = Math.min(candles.length - 1, Math.ceil(windowStartIdx + visibleCandlesCount));
             const visibleCandles = candles.slice(startIndex, endIndex + 1);
             
-            // FIX: Initialize min/max using actual visible data spread rather than the fixed initial realPrice
             let minP = visibleCandles.length > 0 ? visibleCandles[0].low : currentPrice;
             let maxP = visibleCandles.length > 0 ? visibleCandles[0].high : currentPrice;
             
@@ -696,10 +693,6 @@
             }
             
             const rangeRaw = maxP - minP || 100;
-            // INCREASE BOTTOM PADDING:
-            // By subtracting more from the min visible price than we add to the max,
-            // we force the candlesticks to sit higher in the chart area.
-            // 45% padding at the bottom leaves plenty of room for volume bars.
             let finalMinP = minP - (rangeRaw * 0.45); 
             let finalMaxP = maxP + (rangeRaw * 0.15);
             
@@ -760,6 +753,7 @@
             if (isDrawing) { drawingCurrent = { x: mouseX, y: mouseY }; drawChart(); return; }
             const index = getIndexAtX(mouseX, scale);
             if (index >= 0 && index < candles.length) {
+                hoverIndex = index; // Set the hover index for vertical line
                 const c = candles[index];
                 const pct = ((c.close / c.open) - 1) * 100;
                 tooltip.style.display = 'block';
@@ -778,7 +772,11 @@
                     </div>
                 `;
                 if (mouseX + 160 > canvas.width) tooltip.style.left = (mouseX - 150) + 'px';
-            } else { tooltip.style.display = 'none'; }
+            } else { 
+                tooltip.style.display = 'none'; 
+                hoverIndex = null;
+            }
+            drawChart(); // Redraw chart on mouse move to show the vertical crosshair
         }
 
         function handleMouseUp(e) {
@@ -811,17 +809,12 @@
         function checkLiquidation() {
             if (tradingMode !== 'futures' || btcBalance === 0) return false;
             
-            // Refined Check: Equity = Available + Locked Margin + PnL
             let unrealizedPnL = 0;
             if(btcBalance > 0) unrealizedPnL = (currentPrice - entryPrice) * btcBalance;
             else unrealizedPnL = (entryPrice - currentPrice) * Math.abs(btcBalance);
             
             const totalEquity = usdtBalance + marginUsed + unrealizedPnL;
-            
-            // Liquidate if total account equity reaches 0
             if (totalEquity <= 0) return true;
-
-            // Direct check against liq price (backup)
             if (btcBalance > 0 && currentPrice <= liquidationPrice) return true;
             if (btcBalance < 0 && currentPrice >= liquidationPrice) return true;
             return false;
@@ -849,7 +842,6 @@
             if(currentPrice > currentCandle.high) currentCandle.high = currentPrice;
             if(currentPrice < currentCandle.low) currentCandle.low = currentPrice;
             
-            // Volume simulation
             currentCandle.volume = (currentCandle.volume || 0) + (Math.random() * 2);
 
             tickSubCount++;
@@ -891,9 +883,22 @@
             const startI = Math.max(0, Math.floor(s.windowStartIdx));
             const endI = Math.min(candles.length - 1, Math.ceil(s.windowStartIdx + visibleCandlesCount));
             
+            // Draw hover vertical line (Crosshair)
+            if (hoverIndex !== null && hoverIndex >= startI && hoverIndex <= endI) {
+                const hoverX = getX(hoverIndex, s);
+                ctx.setLineDash([4, 4]);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(hoverX, 0);
+                ctx.lineTo(hoverX, s.h - s.padding);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
             // --- DRAW VOLUME BARS ---
             const maxVolVisible = Math.max(...candles.slice(startI, endI + 1).map(c => c.volume || 0), 1);
-            const volPaneHeight = s.h * 0.15; // Volume bars take up bottom 15%
+            const volPaneHeight = s.h * 0.15; 
             for(let i = startI; i <= endI; i++) {
                 const c = candles[i];
                 const x = getX(i, s);
@@ -917,7 +922,6 @@
                 const bTop = getY(Math.max(c.open, c.close), s); 
                 const bBot = getY(Math.min(c.open, c.close), s);
                 ctx.fillStyle = color;
-                // FIX: Ensure minimum candle body height is visible, but the scale itself is now corrected.
                 ctx.fillRect(x - candleWidth/2, bTop, Math.max(1, candleWidth), Math.max(0.5, bBot - bTop));
             }
 
@@ -940,7 +944,6 @@
                 ctx.moveTo(drawingStart.x, drawingStart.y); ctx.lineTo(drawingCurrent.x, drawingCurrent.y); ctx.stroke();
             }
 
-            // Spot Entry Line
             if (tradingMode === 'spot' && btcBalance > 0) {
                 const sEntryY = getY(spotEntryPrice, s);
                 if (sEntryY >= 0 && sEntryY <= s.h) {
@@ -951,7 +954,6 @@
                 }
             }
 
-            // Futures Lines
             if (tradingMode === 'futures' && btcBalance !== 0) {
                 const fEntryY = getY(entryPrice, s);
                 if (fEntryY >= 0 && fEntryY <= s.h) {
@@ -1179,7 +1181,6 @@
                     btcBalance = (currentMode === 'buy' ? btcBalance + actualSize : btcBalance - actualSize);
                 }
 
-                // Recalculate Liquidation Price based on TOTAL account equity (isolated + available)
                 const totalCollateral = usdtBalance + marginUsed;
                 if(btcBalance > 0) { 
                     liquidationPrice = entryPrice - (totalCollateral / btcBalance);
