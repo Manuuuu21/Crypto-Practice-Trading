@@ -522,7 +522,7 @@
             spotEntryPrice = 0;
             liquidationPrice = 0;
             marginUsed = 0;
-            // drawings = [];
+            // drawings = []; // REMOVED: Drawings are no longer cleared on app reset
             setTradingMode(tradingMode);
             const levInput = document.getElementById('leverage-input');
             if(levInput) levInput.value = levInput.value;
@@ -685,8 +685,11 @@
             const startIndex = Math.max(0, Math.floor(windowStartIdx));
             const endIndex = Math.min(candles.length - 1, Math.ceil(windowStartIdx + visibleCandlesCount));
             const visibleCandles = candles.slice(startIndex, endIndex + 1);
-            let minP = realPrice;
-            let maxP = realPrice;
+            
+            // FIX: Initialize min/max using actual visible data spread rather than the fixed initial realPrice
+            let minP = visibleCandles.length > 0 ? visibleCandles[0].low : currentPrice;
+            let maxP = visibleCandles.length > 0 ? visibleCandles[0].high : currentPrice;
+            
             if (visibleCandles.length > 0) {
                 minP = Math.min(...visibleCandles.map(c => c.low));
                 maxP = Math.max(...visibleCandles.map(c => c.high));
@@ -914,7 +917,8 @@
                 const bTop = getY(Math.max(c.open, c.close), s); 
                 const bBot = getY(Math.min(c.open, c.close), s);
                 ctx.fillStyle = color;
-                ctx.fillRect(x - candleWidth/2, bTop, Math.max(1, candleWidth), Math.max(1, bBot - bTop));
+                // FIX: Ensure minimum candle body height is visible, but the scale itself is now corrected.
+                ctx.fillRect(x - candleWidth/2, bTop, Math.max(1, candleWidth), Math.max(0.5, bBot - bTop));
             }
 
             const py = getY(currentPrice, s);
