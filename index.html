@@ -409,7 +409,7 @@
         let marginUsed = 0; 
 
         let candles = [];
-        const MAX_CANDLES = 10000;
+        const MAX_CANDLES = 100000; // INCREASED: Supported capacity up to 100,000 candles
         const INITIAL_CANDLES = 100;
         
         let currentTimeframe = 5;
@@ -417,7 +417,7 @@
         let panOffset = 0;
         let isPanning = false;
         let lastMouseX = 0;
-        let hoverIndex = null; // NEW: Track which candle index is being hovered for the crosshair
+        let hoverIndex = null; 
 
         let tickSubCount = 0;
         let currentSliderPct = 0; 
@@ -471,11 +471,11 @@
             window.addEventListener('mouseup', handleMouseUp);
             canvas.addEventListener('mouseleave', () => {
                 tooltip.style.display = 'none';
-                hoverIndex = null; // Clear crosshair on leave
+                hoverIndex = null; 
                 drawingCurrent = null;
                 isPanning = false;
                 canvas.style.cursor = 'crosshair';
-                drawChart(); // Redraw to remove crosshair
+                drawChart(); 
             });
 
             canvas.addEventListener('touchstart', (e) => {
@@ -682,14 +682,15 @@
             const windowStartIdx = candles.length - visibleCandlesCount - panOffset;
             const startIndex = Math.max(0, Math.floor(windowStartIdx));
             const endIndex = Math.min(candles.length - 1, Math.ceil(windowStartIdx + visibleCandlesCount));
-            const visibleCandles = candles.slice(startIndex, endIndex + 1);
             
-            let minP = visibleCandles.length > 0 ? visibleCandles[0].low : currentPrice;
-            let maxP = visibleCandles.length > 0 ? visibleCandles[0].high : currentPrice;
+            // OPTIMIZATION: Only map visible portion to find min/max price
+            const visibleSlice = candles.slice(startIndex, endIndex + 1);
+            let minP = visibleSlice.length > 0 ? visibleSlice[0].low : currentPrice;
+            let maxP = visibleSlice.length > 0 ? visibleSlice[0].high : currentPrice;
             
-            if (visibleCandles.length > 0) {
-                minP = Math.min(...visibleCandles.map(c => c.low));
-                maxP = Math.max(...visibleCandles.map(c => c.high));
+            for (let i = 0; i < visibleSlice.length; i++) {
+                if (visibleSlice[i].low < minP) minP = visibleSlice[i].low;
+                if (visibleSlice[i].high > maxP) maxP = visibleSlice[i].high;
             }
             
             const rangeRaw = maxP - minP || 100;
@@ -753,7 +754,7 @@
             if (isDrawing) { drawingCurrent = { x: mouseX, y: mouseY }; drawChart(); return; }
             const index = getIndexAtX(mouseX, scale);
             if (index >= 0 && index < candles.length) {
-                hoverIndex = index; // Set the hover index for vertical line
+                hoverIndex = index; 
                 const c = candles[index];
                 const pct = ((c.close / c.open) - 1) * 100;
                 tooltip.style.display = 'block';
@@ -776,7 +777,7 @@
                 tooltip.style.display = 'none'; 
                 hoverIndex = null;
             }
-            drawChart(); // Redraw chart on mouse move to show the vertical crosshair
+            drawChart(); 
         }
 
         function handleMouseUp(e) {
@@ -855,6 +856,8 @@
                     low: currentPrice,
                     volume: Math.random() * 2 + 1 
                 });
+                
+                // PERFORMANCE FIX: Only shift if we exceed the high 100k limit
                 if (candles.length > MAX_CANDLES) {
                     candles.shift();
                     drawings.forEach(d => { d.startIdx--; d.endIdx--; });
@@ -896,8 +899,9 @@
                 ctx.setLineDash([]);
             }
 
-            // --- DRAW VOLUME BARS ---
-            const maxVolVisible = Math.max(...candles.slice(startI, endI + 1).map(c => c.volume || 0), 1);
+            // --- DRAW VOLUME BARS (ONLY VISIBLE) ---
+            const visibleSubset = candles.slice(startI, endI + 1);
+            const maxVolVisible = Math.max(...visibleSubset.map(c => c.volume || 0), 1);
             const volPaneHeight = s.h * 0.15; 
             for(let i = startI; i <= endI; i++) {
                 const c = candles[i];
@@ -908,7 +912,7 @@
                 ctx.fillRect(x - candleWidth/2, s.h - s.padding - volHeight, Math.max(1, candleWidth), volHeight);
             }
 
-            // --- DRAW CANDLESTICKS ---
+            // --- DRAW CANDLESTICKS (ONLY VISIBLE) ---
             for(let i = startI; i <= endI; i++) {
                 const c = candles[i];
                 const x = getX(i, s); 
@@ -934,11 +938,20 @@
             ctx.lineTo(s.chartW + gutterOffset, py);
             ctx.stroke();
             ctx.setLineDash([]);
+            
+            // --- DRAW TRENDLINES (ONLY VISIBLE ONES) ---
             ctx.lineWidth = 2; ctx.strokeStyle = '#f3ba2f';
             drawings.forEach(d => {
-                ctx.beginPath(); ctx.moveTo(getX(d.startIdx, s), getY(d.startPrice, s));
-                ctx.lineTo(getX(d.endIdx, s), getY(d.endPrice, s)); ctx.stroke();
+                // OPTIMIZATION: Skip drawing if trendline is outside the viewport
+                const buffer = 5;
+                if (Math.max(d.startIdx, d.endIdx) < startI - buffer || Math.min(d.startIdx, d.endIdx) > endI + buffer) return;
+
+                ctx.beginPath(); 
+                ctx.moveTo(getX(d.startIdx, s), getY(d.startPrice, s));
+                ctx.lineTo(getX(d.endIdx, s), getY(d.endPrice, s)); 
+                ctx.stroke();
             });
+
             if (isDrawing && drawingStart && drawingCurrent) {
                 ctx.beginPath(); ctx.setLineDash([5, 5]); ctx.strokeStyle = 'rgba(243, 186, 47, 0.6)';
                 ctx.moveTo(drawingStart.x, drawingStart.y); ctx.lineTo(drawingCurrent.x, drawingCurrent.y); ctx.stroke();
@@ -1115,7 +1128,7 @@
             const text = document.getElementById('alert-text');
             if (alert && dot && text) {
                 dot.style.backgroundColor = color; text.innerText = msg; alert.style.opacity = "1"; alert.style.transform = "translateX(0)";
-                setTimeout(() => { alert.style.opacity = "0"; alert.style.transform = "translateX(-20rem)"; }, 3000);
+                setTimeout(() => { alert.style.opacity = "0"; alert.style.transform = "translateX(-20rem)"; }, 5000);
             }
         }
 
