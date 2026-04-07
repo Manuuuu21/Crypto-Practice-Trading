@@ -525,14 +525,19 @@
             drawings = [];
             setTradingMode(tradingMode);
             const levInput = document.getElementById('leverage-input');
-            if(levInput) levInput.value = "20";
-            leverage = 20;
+            if(levInput) levInput.value = levInput.value;
+            leverage = levInput.value;
             const inputSizeEl = document.getElementById('input-size');
             if (inputSizeEl) inputSizeEl.value = "";
             const ruler = document.getElementById('money-ruler');
             if (ruler) ruler.value = 0;
             currentSliderPct = 0;
             updateSliderDots(0);
+            
+            // Also reset session high/low for a full app reset
+            sessionHigh = currentPrice;
+            sessionLow = currentPrice;
+            
             updateUI();
             drawChart();
             showAlert("Account Reset to 1,000 USDT", "#F3BA2F");
@@ -618,12 +623,15 @@
             drawings = [];
             panOffset = 0;
             visibleCandlesCount = INITIAL_CANDLES;
-            initChartData();
+            
+            // Pass true to maintain current 24h High/Low during timeframe switch
+            initChartData(true);
+            
             updateUI();
             drawChart();
         }
 
-        function initChartData() {
+        function initChartData(keepHighLow = false) {
             let savedCurrentPrice = currentPrice;
             candles = [];
             let p = savedCurrentPrice;
@@ -632,6 +640,7 @@
                 let close = p;
                 let high = p;
                 let low = p;
+                let volume = 0;
                 for(let t = 0; t < currentTimeframe; t++) {
                     const tickVol = (Math.random() * 0.98 + 0.01) / 100;
                     const scaledVol = tickVol / 2; 
@@ -639,8 +648,9 @@
                     close += close * (scaledVol * tickDir);
                     if(close > high) high = close;
                     if(close < low) low = close;
+                    volume += Math.random() * 5 + 1;
                 }
-                candles.push({ open, close, high, low });
+                candles.push({ open, close, high, low, volume });
                 p = close;
             }
             const ratio = savedCurrentPrice / p;
@@ -653,8 +663,13 @@
             initialPrice = candles[0].open;
             currentPrice = savedCurrentPrice;
             lastPrice = savedCurrentPrice;
-            sessionHigh = Math.max(...candles.map(c => c.high), savedCurrentPrice);
-            sessionLow = Math.min(...candles.map(c => c.low), savedCurrentPrice);
+            
+            // Only update sessionHigh and sessionLow if we are not instructed to keep them
+            if (!keepHighLow) {
+                sessionHigh = Math.max(...candles.map(c => c.high), savedCurrentPrice);
+                sessionLow = Math.min(...candles.map(c => c.low), savedCurrentPrice);
+            }
+            
             tickSubCount = 0;
         }
 
@@ -676,9 +691,15 @@
                 minP = Math.min(...visibleCandles.map(c => c.low));
                 maxP = Math.max(...visibleCandles.map(c => c.high));
             }
-            const yPadding = (maxP - minP) * 0.1;
-            let finalMinP = minP === maxP ? minP - 100 : minP - yPadding;
-            let finalMaxP = minP === maxP ? maxP + 100 : maxP + yPadding;
+            
+            const rangeRaw = maxP - minP || 100;
+            // INCREASE BOTTOM PADDING:
+            // By subtracting more from the min visible price than we add to the max,
+            // we force the candlesticks to sit higher in the chart area.
+            // 45% padding at the bottom leaves plenty of room for volume bars.
+            let finalMinP = minP - (rangeRaw * 0.45); 
+            let finalMaxP = maxP + (rangeRaw * 0.15);
+            
             let range = finalMaxP - finalMinP || 1;
             const minVisualRange = currentPrice * 0.002;
             if (range < minVisualRange) {
@@ -747,6 +768,7 @@
                     <div class="flex justify-between gap-4"><span>Close:</span> <span class="mono">${formatNum(c.close)}</span></div>
                     <div class="flex justify-between gap-4"><span>High:</span> <span class="mono">${formatNum(c.high)}</span></div>
                     <div class="flex justify-between gap-4"><span>Low:</span> <span class="mono">${formatNum(c.low)}</span></div>
+                    <div class="flex justify-between gap-4"><span>Volume:</span> <span class="mono">${formatNum(c.volume || 0, 1)}</span></div>
                     <div class="border-t border-gray-700 mt-2 pt-2 flex justify-between items-center">
                         <span class="font-bold">CHANGE:</span>
                         <span class="mono font-bold ${pct >= 0 ? 'text-buy' : 'text-sell'}">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</span>
@@ -818,15 +840,26 @@
             if (currentPrice > sessionHigh) sessionHigh = currentPrice;
             if (currentPrice < sessionLow) sessionLow = currentPrice;
             if (checkLiquidation()) { triggerLiquidation(); return; }
+            
             let currentCandle = candles[candles.length - 1];
             currentCandle.close = currentPrice;
             if(currentPrice > currentCandle.high) currentCandle.high = currentPrice;
             if(currentPrice < currentCandle.low) currentCandle.low = currentPrice;
+            
+            // Volume simulation
+            currentCandle.volume = (currentCandle.volume || 0) + (Math.random() * 2);
+
             tickSubCount++;
             if (tickSubCount >= currentTimeframe) {
                 tickSubCount = 0;
                 if (panOffset > 0) panOffset += 1;
-                candles.push({ open: currentPrice, close: currentPrice, high: currentPrice, low: currentPrice });
+                candles.push({ 
+                    open: currentPrice, 
+                    close: currentPrice, 
+                    high: currentPrice, 
+                    low: currentPrice,
+                    volume: Math.random() * 2 + 1 
+                });
                 if (candles.length > MAX_CANDLES) {
                     candles.shift();
                     drawings.forEach(d => { d.startIdx--; d.endIdx--; });
@@ -850,9 +883,24 @@
                 ctx.fillText(formatNum(price, 0), s.chartW + gutterOffset + 10, py + 3);
             }
             ctx.setLineDash([]);
+
             const candleWidth = (s.chartW / visibleCandlesCount) * 0.6;
             const startI = Math.max(0, Math.floor(s.windowStartIdx));
             const endI = Math.min(candles.length - 1, Math.ceil(s.windowStartIdx + visibleCandlesCount));
+            
+            // --- DRAW VOLUME BARS ---
+            const maxVolVisible = Math.max(...candles.slice(startI, endI + 1).map(c => c.volume || 0), 1);
+            const volPaneHeight = s.h * 0.15; // Volume bars take up bottom 15%
+            for(let i = startI; i <= endI; i++) {
+                const c = candles[i];
+                const x = getX(i, s);
+                const isUp = c.close >= c.open;
+                const volHeight = ((c.volume || 0) / maxVolVisible) * volPaneHeight;
+                ctx.fillStyle = isUp ? 'rgba(0, 192, 135, 0.3)' : 'rgba(248, 73, 96, 0.3)';
+                ctx.fillRect(x - candleWidth/2, s.h - s.padding - volHeight, Math.max(1, candleWidth), volHeight);
+            }
+
+            // --- DRAW CANDLESTICKS ---
             for(let i = startI; i <= endI; i++) {
                 const c = candles[i];
                 const x = getX(i, s); 
@@ -868,6 +916,7 @@
                 ctx.fillStyle = color;
                 ctx.fillRect(x - candleWidth/2, bTop, Math.max(1, candleWidth), Math.max(1, bBot - bTop));
             }
+
             const py = getY(currentPrice, s);
             ctx.setLineDash([4, 4]);
             ctx.strokeStyle = currentPrice >= lastPrice ? 'rgba(0, 192, 135, 0.5)' : 'rgba(248, 73, 96, 0.5)';
@@ -1116,22 +1165,22 @@
                     entryPrice = price;
                     marginUsed = marginReq;
                     usdtBalance -= marginReq;
+                    btcBalance = (currentMode === 'buy' ? actualSize : -actualSize);
                 } else {
                     const totalCost = (Math.abs(btcBalance) * entryPrice) + (actualSize * price);
                     const totalSize = Math.abs(btcBalance) + actualSize;
                     entryPrice = totalCost / totalSize;
                     marginUsed += marginReq;
                     usdtBalance -= marginReq;
+                    btcBalance = (currentMode === 'buy' ? btcBalance + actualSize : btcBalance - actualSize);
                 }
 
                 // Recalculate Liquidation Price based on TOTAL account equity (isolated + available)
                 const totalCollateral = usdtBalance + marginUsed;
-                if(currentMode === 'buy') { 
-                    btcBalance += actualSize; 
+                if(btcBalance > 0) { 
                     liquidationPrice = entryPrice - (totalCollateral / btcBalance);
                 } 
                 else { 
-                    btcBalance -= actualSize; 
                     liquidationPrice = entryPrice + (totalCollateral / Math.abs(btcBalance));
                 }
                 
