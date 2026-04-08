@@ -966,8 +966,8 @@
 
         function tick() {
             let maxVol = 0.40;
-            if (currentTimeframe === 15) maxVol = 0.13;
-            else if (currentTimeframe === 30) maxVol = 0.07;
+            if (currentTimeframe === 15) maxVol = 0.30;
+            else if (currentTimeframe === 30) maxVol = 0.20;
             
             const tickVol = (Math.random() * (maxVol - 0.01) + 0.01) / 100;
             const tickDir = Math.random() > 0.5 ? 1 : -1; 
