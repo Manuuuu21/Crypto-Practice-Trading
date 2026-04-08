@@ -458,6 +458,7 @@
 
         let drawings = []; 
         let isDrawingMode = false;
+        let tickInterval = null;
         let activeDrawingTool = 'line';
         let isDrawing = false;
         let drawingStart = null; 
@@ -490,6 +491,7 @@
         }
 
         window.onload = async () => {
+            if (tickInterval) clearInterval(tickInterval);
             try {
                 // Public API endpoint for BTC price in USD
                 const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
@@ -515,7 +517,7 @@
             resizeCanvas();
             updateUI();
             
-            setInterval(tick, 1000); 
+            tickInterval = setInterval(tick, 1000); 
             window.addEventListener('resize', resizeCanvas);
 
             canvas.addEventListener('wheel', (e) => {
@@ -738,38 +740,31 @@
 
             // Step 2: Scale and Align
             if (keepHighLow) {
-                // 1. Align the end price first using drift
-                let finalCloseRaw = tempCandles[tempCandles.length - 1].close;
-                let diff = savedCurrentPrice - finalCloseRaw;
+                // If keeping High/Low, we need to map the new random history 
+                // so it fits exactly between existing sessionHigh and sessionLow
+                let localMin = Math.min(...tempCandles.map(c => c.low));
+                let localMax = Math.max(...tempCandles.map(c => c.high));
+                let localRange = localMax - localMin || 1;
+                let targetRange = sessionHigh - sessionLow || 1;
+
+                // Stretch history to fill the range
+                for(let i = 0; i < tempCandles.length; i++) {
+                    const mapVal = (v) => sessionLow + ((v - localMin) / localRange) * targetRange;
+                    tempCandles[i].open = mapVal(tempCandles[i].open);
+                    tempCandles[i].close = mapVal(tempCandles[i].close);
+                    tempCandles[i].high = mapVal(tempCandles[i].high);
+                    tempCandles[i].low = mapVal(tempCandles[i].low);
+                }
+
+                // Bend history so the final candle close hits savedCurrentPrice (the "now" price)
+                let finalClose = tempCandles[tempCandles.length - 1].close;
+                let diff = savedCurrentPrice - finalClose;
                 for(let i = 0; i < tempCandles.length; i++) {
                     const drift = diff * (i / (tempCandles.length - 1));
                     tempCandles[i].open += drift;
                     tempCandles[i].close += drift;
                     tempCandles[i].high += drift;
                     tempCandles[i].low += drift;
-                }
-
-                // 2. Now find the local min/max of the drifted candles
-                let localMin = Math.min(...tempCandles.map(c => c.low));
-                let localMax = Math.max(...tempCandles.map(c => c.high));
-
-                // 3. Scale piecewise relative to savedCurrentPrice to fit [sessionLow, sessionHigh]
-                // This ensures the final close stays at savedCurrentPrice while the range is exactly sessionLow to sessionHigh
-                for(let i = 0; i < tempCandles.length; i++) {
-                    const scaleVal = (v) => {
-                        if (v > savedCurrentPrice) {
-                            if (localMax <= savedCurrentPrice) return v;
-                            return savedCurrentPrice + (v - savedCurrentPrice) * ((sessionHigh - savedCurrentPrice) / (localMax - savedCurrentPrice));
-                        } else if (v < savedCurrentPrice) {
-                            if (localMin >= savedCurrentPrice) return v;
-                            return savedCurrentPrice - (savedCurrentPrice - v) * ((savedCurrentPrice - sessionLow) / (savedCurrentPrice - localMin));
-                        }
-                        return v;
-                    };
-                    tempCandles[i].open = scaleVal(tempCandles[i].open);
-                    tempCandles[i].close = scaleVal(tempCandles[i].close);
-                    tempCandles[i].high = scaleVal(tempCandles[i].high);
-                    tempCandles[i].low = scaleVal(tempCandles[i].low);
                 }
             } else {
                 // Default behavior (Ratio-based alignment)
@@ -780,8 +775,8 @@
                     tempCandles[i].high *= ratio;
                     tempCandles[i].low *= ratio;
                 }
-                sessionHigh = Math.max(...tempCandles.map(c => c.high));
-                sessionLow = Math.min(...tempCandles.map(c => c.low));
+                sessionHigh = Math.max(...tempCandles.map(c => c.high), savedCurrentPrice);
+                sessionLow = Math.min(...tempCandles.map(c => c.low), savedCurrentPrice);
             }
 
             candles = tempCandles;
@@ -969,21 +964,30 @@
         }
 
         function tick() {
-            let maxVol = 0.98;
-            if (currentTimeframe === 15) maxVol = 0.33;
-            else if (currentTimeframe === 30) maxVol = 0.17;
+            let maxVol = 0.40;
+            if (currentTimeframe === 15) maxVol = 0.13;
+            else if (currentTimeframe === 30) maxVol = 0.07;
             
-            const tickVol = (Math.random() * maxVol + 0.01) / 100;
-            const scaledVol = tickVol / 2; 
+            const tickVol = (Math.random() * (maxVol - 0.01) + 0.01) / 100;
             const tickDir = Math.random() > 0.5 ? 1 : -1; 
-            const priceChange = currentPrice * (scaledVol * tickDir);
+            let priceChange = currentPrice * (tickVol * tickDir);
+            
+            let currentCandle = candles[candles.length - 1];
+            const maxCandleHeight = currentCandle.open * 0.0199;
+            let nextPrice = currentPrice + priceChange;
+            
+            // Cap price to respect 4.99% max candle height
+            const upperLimit = currentCandle.open + maxCandleHeight;
+            const lowerLimit = currentCandle.open - maxCandleHeight;
+            if (nextPrice > upperLimit) nextPrice = upperLimit;
+            if (nextPrice < lowerLimit) nextPrice = lowerLimit;
+
             lastPrice = currentPrice; 
-            currentPrice += priceChange;
+            currentPrice = nextPrice;
             if (currentPrice > sessionHigh) sessionHigh = currentPrice;
             if (currentPrice < sessionLow) sessionLow = currentPrice;
             if (checkLiquidation()) { triggerLiquidation(); return; }
             
-            let currentCandle = candles[candles.length - 1];
             currentCandle.close = currentPrice;
             if(currentPrice > currentCandle.high) currentCandle.high = currentPrice;
             if(currentPrice < currentCandle.low) currentCandle.low = currentPrice;
@@ -1000,11 +1004,12 @@
             if (tickSubCount >= currentTimeframe) {
                 tickSubCount = 0;
                 if (panOffset > 0) panOffset += 1;
+                const prevClose = candles[candles.length - 1].close;
                 candles.push({ 
-                    open: currentPrice, 
-                    close: currentPrice, 
-                    high: currentPrice, 
-                    low: currentPrice,
+                    open: prevClose, 
+                    close: prevClose, 
+                    high: prevClose, 
+                    low: prevClose,
                     volume: Math.random() * 2 + 1 
                 });
                 
@@ -1074,7 +1079,9 @@
                 const bTop = getY(Math.max(c.open, c.close), s); 
                 const bBot = getY(Math.min(c.open, c.close), s);
                 ctx.fillStyle = color;
-                ctx.fillRect(x - candleWidth/2, bTop, Math.max(1, candleWidth), Math.max(0.5, bBot - bTop));
+                // Ensure body is at least 1px tall to prevent gaps
+                const bodyHeight = Math.max(1, bBot - bTop);
+                ctx.fillRect(x - candleWidth/2, bTop, Math.max(1, candleWidth), bodyHeight);
             }
 
             const py = getY(currentPrice, s);
