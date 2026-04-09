@@ -328,7 +328,10 @@
             </div>
             <div class="hidden lg:block border-l border-gray-custom pl-8 shrink-0">
                 <div class="text-gray-500">Position Size</div>
-                <div id="holding-btc" class="mono text-gray-300">0.000000</div>
+                <div class="flex items-center space-x-1">
+                    <span id="holding-btc" class="mono text-gray-300">0.000000</span>
+                    <span id="pos-side-badge" class="text-[8px] font-bold px-1 rounded hidden"></span>
+                </div>
             </div>
         </div>
 
@@ -479,7 +482,10 @@
                         </div>
                         <div class="flex justify-between text-gray-500 font-medium">
                             <span id="summary-btc-label">Total BTC</span>
-                            <span id="available-btc" class="text-gray-300 mono font-bold">0.000000</span>
+                            <div class="flex items-center space-x-1">
+                                <span id="available-btc" class="text-gray-300 mono font-bold">0.000000</span>
+                                <span id="btc-side-badge" class="text-[8px] font-bold px-1 rounded hidden"></span>
+                            </div>
                         </div>
                         <div class="flex justify-between text-gray-500 font-medium border-t border-gray-300 pt-1 mt-1">
                             <span id="max-possible-label" class="text-yellow-500/80 uppercase font-bold tracking-tighter">Max Buying Power</span>
@@ -518,7 +524,10 @@
                     </div>
                     <div class="flex justify-between border-t border-gray-custom/30 pt-3 text-[10px]">
                         <span id="inventory-label" class="text-gray-500 uppercase font-bold tracking-tighter">Current Inventory:</span>
-                        <span id="holding-btc-val" class="text-gray-200 mono font-bold">0.00 BTC</span>
+                        <div class="flex items-center space-x-1">
+                            <span id="holding-btc-val" class="text-gray-200 mono font-bold">0.00 BTC</span>
+                            <span id="pos-side-badge-port" class="text-[8px] font-bold px-1 rounded hidden"></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -543,8 +552,8 @@
 
     <script>
         // --- STATE ---
-        const INITIAL_TOTAL_BALANCE = 1000.00;
-        let usdtBalance = 1000.00;
+        const INITIAL_TOTAL_BALANCE = 500.00;
+        let usdtBalance = 500.00;
         let btcBalance = 0.00000000;
         let realPrice = 66000.00;
         let initialPrice = realPrice;
@@ -572,6 +581,7 @@
         let lastMouseX = 0;
         let lastTouchDist = 0;
         let hoverIndex = null; 
+        let hoverY = null; 
 
         let tickSubCount = 0;
         let currentSliderPct = 0; 
@@ -684,6 +694,7 @@
             canvas.addEventListener('mouseleave', () => {
                 tooltip.style.display = 'none';
                 hoverIndex = null; 
+                hoverY = null;
                 drawingCurrent = null;
                 isPanning = false;
                 canvas.style.cursor = 'crosshair';
@@ -774,7 +785,7 @@
             drawChart();
             tradeHistory = [];
             renderTradeHistory();
-            showAlert("Account Reset to 1,000 USDT", "#F3BA2F");
+            showAlert(`Account Reset to ${INITIAL_TOTAL_BALANCE.toLocaleString()} USDT`, "#F3BA2F");
         }
 
         function updateLeverage(val) {
@@ -1078,10 +1089,12 @@
 
             if (shouldShowTooltip && index >= 0 && index < candles.length) {
                 hoverIndex = index; 
+                hoverY = mouseY;
                 updateTooltipUI(mouseX, mouseY, index);
             } else { 
                 tooltip.style.display = 'none'; 
                 hoverIndex = null;
+                hoverY = null;
             }
             drawChart(); 
         }
@@ -1092,6 +1105,7 @@
                 longPressTimer = null;
             }
             isLongPressed = false;
+            hoverY = null;
 
             if (isDrawingMode && isDrawing) {
                 const rect = canvas.getBoundingClientRect();
@@ -1282,16 +1296,37 @@
             const startI = Math.max(0, Math.floor(s.windowStartIdx));
             const endI = Math.min(candles.length - 1, Math.ceil(s.windowStartIdx + visibleCandlesCount));
             
-            if (hoverIndex !== null && hoverIndex >= startI && hoverIndex <= endI) {
+            if (hoverIndex !== null && hoverY !== null && hoverIndex >= startI && hoverIndex <= endI) {
                 const hoverX = getX(hoverIndex, s);
                 ctx.setLineDash([4, 4]);
                 ctx.strokeStyle = crosshairColor;
                 ctx.lineWidth = 1;
+                
+                // Vertical line
                 ctx.beginPath();
                 ctx.moveTo(hoverX, 0);
                 ctx.lineTo(hoverX, s.h - s.padding);
                 ctx.stroke();
+
+                // Horizontal line
+                ctx.beginPath();
+                ctx.moveTo(0, hoverY);
+                ctx.lineTo(s.chartW + gutterOffset, hoverY);
+                ctx.stroke();
+                
                 ctx.setLineDash([]);
+
+                // Price label on axis
+                const hoverPrice = getPriceAtY(hoverY, s);
+                const labelText = formatNum(hoverPrice, 0);
+                const labelWidth = ctx.measureText(labelText).width + 10;
+                const labelHeight = 16;
+                
+                ctx.fillStyle = isLight ? '#e0e3e7' : '#2b3139'; // Light gray for light mode, dark for dark mode
+                ctx.fillRect(s.chartW + gutterOffset, hoverY - labelHeight/2, labelWidth, labelHeight);
+                
+                ctx.fillStyle = isLight ? '#1e2329' : '#ffffff';
+                ctx.fillText(labelText, s.chartW + gutterOffset + 5, hoverY + 4);
             }
 
             const visibleSubset = candles.slice(startI, endI + 1);
@@ -1524,7 +1559,17 @@
             const availUsdtEl = document.getElementById('available-usdt');
             if (availUsdtEl) availUsdtEl.innerText = formatNum(usdtBalance);
             const availBtcEl = document.getElementById('available-btc');
-            if (availBtcEl) availBtcEl.innerText = btcBalance.toFixed(8);
+            const btcSideBadge = document.getElementById('btc-side-badge');
+            if (availBtcEl) availBtcEl.innerText = Math.abs(btcBalance).toFixed(8);
+            if (btcSideBadge) {
+                if (tradingMode === 'futures' && btcBalance !== 0) {
+                    btcSideBadge.classList.remove('hidden');
+                    btcSideBadge.innerText = btcBalance > 0 ? 'LONG' : 'SHORT';
+                    btcSideBadge.className = `text-[8px] font-bold px-1 rounded ${btcBalance > 0 ? 'bg-buy/20 text-buy' : 'bg-sell/20 text-sell'}`;
+                } else {
+                    btcSideBadge.classList.add('hidden');
+                }
+            }
             const maxPossibleValEl = document.getElementById('max-possible-val');
             const maxPossibleLabelEl = document.getElementById('max-possible-label');
             const availFundText = document.getElementById('avail-fund-text');
@@ -1546,7 +1591,7 @@
             const totalEstEl = document.getElementById('total-est-value');
             if (totalEstEl) totalEstEl.innerText = formatNum(totalVal) + " USDT";
             const inventoryValEl = document.getElementById('holding-btc-val');
-            if (inventoryValEl) inventoryValEl.innerText = `${Math.abs(btcBalance).toFixed(6)} BTC ${tradingMode === 'futures' && isPositionOpen ? (btcBalance > 0 ? '(LONG)' : '(SHORT)') : ''}`;
+            if (inventoryValEl) inventoryValEl.innerText = `${Math.abs(btcBalance).toFixed(6)} BTC`;
             const pnlRow = document.getElementById('unrealized-pnl-row');
             const liqRow = document.getElementById('liq-price-row');
             const closeBtn = document.getElementById('btn-close-position');
@@ -1578,7 +1623,27 @@
             const inputPriceEl = document.getElementById('input-price');
             if (inputPriceEl && document.activeElement !== inputPriceEl) inputPriceEl.value = formatNum(currentPrice);
             const holdingBtcTicker = document.getElementById('holding-btc');
-            if (holdingBtcTicker) holdingBtcTicker.innerText = btcBalance.toFixed(6);
+            const posSideBadge = document.getElementById('pos-side-badge');
+            const posSideBadgePort = document.getElementById('pos-side-badge-port');
+            if (holdingBtcTicker) holdingBtcTicker.innerText = Math.abs(btcBalance).toFixed(6);
+            if (posSideBadge) {
+                if (tradingMode === 'futures' && btcBalance !== 0) {
+                    posSideBadge.classList.remove('hidden');
+                    posSideBadge.innerText = btcBalance > 0 ? 'LONG' : 'SHORT';
+                    posSideBadge.className = `text-[8px] font-bold px-1 rounded ${btcBalance > 0 ? 'bg-buy/20 text-buy' : 'bg-sell/20 text-sell'}`;
+                } else {
+                    posSideBadge.classList.add('hidden');
+                }
+            }
+            if (posSideBadgePort) {
+                if (tradingMode === 'futures' && btcBalance !== 0) {
+                    posSideBadgePort.classList.remove('hidden');
+                    posSideBadgePort.innerText = btcBalance > 0 ? 'LONG' : 'SHORT';
+                    posSideBadgePort.className = `text-[8px] font-bold px-1 rounded ${btcBalance > 0 ? 'bg-buy/20 text-buy' : 'bg-sell/20 text-sell'}`;
+                } else {
+                    posSideBadgePort.classList.add('hidden');
+                }
+            }
         }
 
         function updateSliderDots(val) {
@@ -1724,7 +1789,7 @@
                 }
 
                 const buyingPower = usdtBalance * leverage; // usdtBalance is updated after closePosition
-                const actualSize = (currentSliderPct === 100) ? (buyingPower / price) : requestedSize;
+                const actualSize = Math.abs((currentSliderPct === 100) ? (buyingPower / price) : requestedSize);
                 const marginReq = (actualSize * price) / leverage; 
                 
                 if(marginReq > usdtBalance + 0.01) return showAlert("Insufficient Margin", "#f84960");
