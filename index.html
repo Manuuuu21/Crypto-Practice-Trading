@@ -730,10 +730,13 @@
                     const tickVol = (Math.random() * 0.98 + 0.01) / 100;
                     const scaledVol = tickVol / 2; 
                     const tickDir = Math.random() > 0.5 ? 1 : -1; 
-                    close += close * (scaledVol * tickDir);
+                    const move = close * (scaledVol * tickDir);
+                    close += move;
                     if(close > high) high = close;
                     if(close < low) low = close;
-                    volume += Math.random() * 5 + 1;
+                    // Price-Linked Volume: volume depends on move magnitude + base noise, normalized by timeframe
+                    const volFactor = 5 / currentTimeframe;
+                    volume += ((Math.abs(move) / open) * 3000 + (Math.random() * 2 + 0.5)) * volFactor;
                 }
                 tempCandles.push({ open, close, high, low, volume });
                 p = close;
@@ -974,7 +977,8 @@
             let priceChange = currentPrice * (tickVol * tickDir);
             
             let currentCandle = candles[candles.length - 1];
-            const maxCandleHeight = currentCandle.open * 0.0199;
+            const progress = tickSubCount / currentTimeframe;
+            const maxCandleHeight = currentCandle.open * (0.0599);
             let nextPrice = currentPrice + priceChange;
             
             // Cap price to respect 4.99% max candle height
@@ -993,7 +997,10 @@
             if(currentPrice > currentCandle.high) currentCandle.high = currentPrice;
             if(currentPrice < currentCandle.low) currentCandle.low = currentPrice;
             
-            currentCandle.volume = (currentCandle.volume || 0) + (Math.random() * 2);
+            // Price-Linked Volume: volume depends on actual price change + base noise, normalized by timeframe
+            const actualMove = Math.abs(currentPrice - lastPrice);
+            const volFactor = 5 / currentTimeframe;
+            currentCandle.volume = (currentCandle.volume || 0) + ((actualMove / currentCandle.open) * 3000 + (Math.random() * 2 + 0.5)) * volFactor;
 
             if (hoverIndex !== null && hoverIndex === candles.length - 1) {
                 const c = candles[hoverIndex];
@@ -1011,7 +1018,7 @@
                     close: prevClose, 
                     high: prevClose, 
                     low: prevClose,
-                    volume: Math.random() * 2 + 1 
+                    volume: Math.random() * 3 
                 });
                 
                 if (candles.length > MAX_CANDLES) {
