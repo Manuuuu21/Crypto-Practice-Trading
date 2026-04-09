@@ -1046,7 +1046,11 @@
                 const scale = getChartScale();
                 if (activeDrawingTool === 'text') {
                     if (window.innerWidth <= 1024) {
-                         // Turn off drawing mode
+                         // Disable button immediately
+                         document.getElementById('tool-text').onclick = null;
+                         document.getElementById('tool-text').style.opacity = '0.5';
+                         document.getElementById('tool-text').style.cursor = 'not-allowed';
+                         // Disable tool
                          isDrawingMode = false;
                          activeDrawingTool = null;
                          document.getElementById('tool-text').classList.remove('active');
