@@ -296,7 +296,7 @@
             
             <div class="bg-dark-panel border border-gray-custom rounded px-2 md:px-3 py-1 flex items-center space-x-2">
                 <span class="hidden md:inline text-gray-500 text-[10px] uppercase font-bold tracking-wider">Total Balance</span>
-                <span id="wallet-balance-header" class="font-bold text-xs md:text-sm text-yellow-400 mono">500.00</span>
+                <span id="wallet-balance-header" class="font-bold text-xs md:text-sm text-yellow-400 mono">1,000.00</span>
                 <span class="text-[10px] text-gray-500 font-bold">USDT</span>
             </div>
         </div>
@@ -440,7 +440,7 @@
                 <div class="space-y-4">
                     <div class="text-[10px] flex justify-between text-gray-500 font-bold uppercase tracking-tighter">
                         <span id="avail-fund-text">Available</span>
-                        <span id="available-funds-label" class="text-gray-300 mono">500.00 USDT</span>
+                        <span id="available-funds-label" class="text-gray-300 mono">1,000.00 USDT</span>
                     </div>
 
                     <div class="relative group bg-input-custom rounded-md border border-transparent focus-within:border-yellow-400 transition-all duration-200">
@@ -478,7 +478,7 @@
                     <div class="bg-deep p-3 rounded border border-gray-custom/30 text-[10px] space-y-2">
                         <div class="flex justify-between text-gray-500 font-medium">
                             <span id="summary-usdt-label">Total USDT</span>
-                            <span id="available-usdt" class="text-gray-300 mono font-bold">500.00</span>
+                            <span id="available-usdt" class="text-gray-300 mono font-bold">1,000.00</span>
                         </div>
                         <div class="flex justify-between text-gray-500 font-medium">
                             <span id="summary-btc-label">Total BTC</span>
@@ -508,7 +508,7 @@
                 <div class="space-y-3 text-[12px]">
                     <div class="flex justify-between">
                         <span class="text-gray-400">Total Net Value</span>
-                        <span id="total-est-value" class="font-bold text-yellow-400 mono">500.00 USDT</span>
+                        <span id="total-est-value" class="font-bold text-yellow-400 mono">1,000.00 USDT</span>
                     </div>
                     <div id="unrealized-pnl-row" class="hidden flex justify-between">
                         <span class="text-gray-400">Unrealized PnL</span>
@@ -778,8 +778,8 @@
             currentSliderPct = 0;
             updateSliderDots(0);
             
-            sessionHigh = currentPrice;
-            sessionLow = currentPrice;
+            sessionHigh = Math.max(...candles.map(c => c.high), currentPrice);
+            sessionLow = Math.min(...candles.map(c => c.low), currentPrice);
             
             updateUI();
             drawChart();
@@ -867,6 +867,10 @@
             panOffset = 0;
             visibleCandlesCount = INITIAL_CANDLES;
             
+            // Reset Interval to ensure clean timing
+            if (tickInterval) clearInterval(tickInterval);
+            tickInterval = setInterval(tick, 1000);
+            
             initChartData(true);
             
             updateUI();
@@ -938,11 +942,14 @@
                     tempCandles[i].high *= ratio;
                     tempCandles[i].low *= ratio;
                 }
-                sessionHigh = Math.max(...tempCandles.map(c => c.high), savedCurrentPrice);
-                sessionLow = Math.min(...tempCandles.map(c => c.low), savedCurrentPrice);
             }
-
+            
             candles = tempCandles;
+            
+            // Recalculate Session High/Low to match exactly the wicks of the generated chart
+            sessionHigh = Math.max(...candles.map(c => c.high), savedCurrentPrice);
+            sessionLow = Math.min(...candles.map(c => c.low), savedCurrentPrice);
+            
             initialPrice = candles[0].open;
             currentPrice = savedCurrentPrice;
             lastPrice = savedCurrentPrice;
@@ -1292,12 +1299,13 @@
                 ctx.fillText(formatNum(price, 0), s.chartW + gutterOffset + 10, py + 3);
             }
 
-            const candleWidth = (s.chartW / visibleCandlesCount) * 0.6;
+            const candleWidthFactor = 0.8; // Increased for a more filled look
+            const candleWidth = (s.chartW / visibleCandlesCount) * candleWidthFactor;
             const startI = Math.max(0, Math.floor(s.windowStartIdx));
             const endI = Math.min(candles.length - 1, Math.ceil(s.windowStartIdx + visibleCandlesCount));
             
             if (hoverIndex !== null && hoverY !== null && hoverIndex >= startI && hoverIndex <= endI) {
-                const hoverX = getX(hoverIndex, s);
+                const hoverX = Math.round(getX(hoverIndex, s));
                 ctx.setLineDash([4, 4]);
                 ctx.strokeStyle = crosshairColor;
                 ctx.lineWidth = 1;
@@ -1322,7 +1330,7 @@
                 const labelWidth = ctx.measureText(labelText).width + 10;
                 const labelHeight = 16;
                 
-                ctx.fillStyle = isLight ? '#e0e3e7' : '#2b3139'; // Light gray for light mode, dark for dark mode
+                ctx.fillStyle = isLight ? '#e0e3e7' : '#2b3139'; 
                 ctx.fillRect(s.chartW + gutterOffset, hoverY - labelHeight/2, labelWidth, labelHeight);
                 
                 ctx.fillStyle = isLight ? '#1e2329' : '#ffffff';
@@ -1334,29 +1342,38 @@
             const volPaneHeight = s.h * 0.15; 
             for(let i = startI; i <= endI; i++) {
                 const c = candles[i];
-                const x = getX(i, s);
+                const x = Math.round(getX(i, s));
                 const isUp = c.close >= c.open;
                 const volHeight = ((c.volume || 0) / maxVolVisible) * volPaneHeight;
                 ctx.fillStyle = isUp ? 'rgba(0, 192, 135, 0.3)' : 'rgba(248, 73, 96, 0.3)';
-                ctx.fillRect(x - candleWidth/2, s.h - s.padding - volHeight, Math.max(1, candleWidth), volHeight);
+                const vW = Math.max(1, Math.floor(candleWidth));
+                ctx.fillRect(x - Math.floor(vW/2), s.h - s.padding - volHeight, vW, volHeight);
             }
 
             for(let i = startI; i <= endI; i++) {
                 const c = candles[i];
-                const x = getX(i, s); 
-                const isUp = c.close >= c.open; const color = isUp ? '#00c087' : '#f84960';
+                const x = Math.round(getX(i, s)); 
+                const isUp = c.close >= c.open; 
+                const color = isUp ? '#00c087' : '#f84960';
+                
+                const cW = Math.max(1, Math.floor(candleWidth));
+                const halfW = Math.floor(cW / 2);
+                
+                // Draw Wick (Pixel Perfect)
                 ctx.strokeStyle = color; 
-                ctx.lineWidth = Math.max(1, candleWidth * 0.15);
+                ctx.lineWidth = 1;
                 ctx.beginPath(); 
-                ctx.moveTo(x, getY(c.high, s)); 
-                ctx.lineTo(x, getY(c.low, s)); 
+                ctx.moveTo(x, Math.round(getY(c.high, s))); 
+                ctx.lineTo(x, Math.round(getY(c.low, s))); 
                 ctx.stroke();
-                const bTop = getY(Math.max(c.open, c.close), s); 
-                const bBot = getY(Math.min(c.open, c.close), s);
+                
+                // Draw Body (Pixel Perfect)
+                const bTop = Math.round(getY(Math.max(c.open, c.close), s)); 
+                const bBot = Math.round(getY(Math.min(c.open, c.close), s));
+                const bodyH = Math.max(1, bBot - bTop);
+                
                 ctx.fillStyle = color;
-                // Ensure body is at least 1px tall to prevent gaps
-                const bodyHeight = Math.max(1, bBot - bTop);
-                ctx.fillRect(x - candleWidth/2, bTop, Math.max(1, candleWidth), bodyHeight);
+                ctx.fillRect(x - halfW, bTop, cW, bodyH);
             }
 
             const py = getY(currentPrice, s);
@@ -1534,7 +1551,9 @@
                 totalVal = usdtBalance + marginUsed + unrealizedPnL;
             }
             const totalPnlPct = (((totalVal / INITIAL_TOTAL_BALANCE) - 1) * 100).toFixed(2);
-            const changePct = ((currentPrice - initialPrice) / initialPrice) * 100;
+            // Anchor 24h Change percentage to the Open of the 1st Candle of the Chart
+            const anchorPrice = (candles && candles.length > 0) ? candles[0].open : initialPrice;
+            const changePct = ((currentPrice - anchorPrice) / anchorPrice) * 100;
             const tickerChangeEl = document.getElementById('ticker-change');
             if (tickerChangeEl) {
                 tickerChangeEl.innerText = `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`;
