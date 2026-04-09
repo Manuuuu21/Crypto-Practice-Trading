@@ -425,8 +425,6 @@
         <div class="w-full lg:w-80 flex flex-col bg-dark-panel shrink-0 overflow-visible lg:overflow-y-auto mobile-trade-form">
             <div class="flex border-b border-gray-custom shrink-0 text-[10px] font-bold">
                 <button class="flex-1 py-3 border-b-2 border-yellow-400 text-yellow-400 uppercase tracking-wider">Limit</button>
-                <button class="flex-1 py-3 text-gray-500 hover:text-gray-300 uppercase tracking-wider">Market</button>
-                <button class="flex-1 py-3 text-gray-500 hover:text-gray-300 uppercase tracking-wider">Stop-Limit</button>
             </div>
 
             <div class="p-2 md:p-4 space-y-2 md:space-y-5">
@@ -1046,11 +1044,7 @@
                 const scale = getChartScale();
                 if (activeDrawingTool === 'text') {
                     if (window.innerWidth <= 1024) {
-                         // Disable button immediately
-                         document.getElementById('tool-text').onclick = null;
-                         document.getElementById('tool-text').style.opacity = '0.5';
-                         document.getElementById('tool-text').style.cursor = 'not-allowed';
-                         // Disable tool
+                         // Turn off drawing mode
                          isDrawingMode = false;
                          activeDrawingTool = null;
                          document.getElementById('tool-text').classList.remove('active');
