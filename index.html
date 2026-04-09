@@ -6,21 +6,59 @@
     <title>CryptoPractice - 5s Candlestick Trader</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap');
-        
+        :root {
+            --bg-body: #0b0e11;
+            --bg-panel: #161a1e;
+            --bg-header: #1e2329;
+            --border-custom: #2b3139;
+            --text-main: #eaecef;
+            --text-muted: #848e9c;
+            --bg-input: #2b3139;
+            --chart-grid: rgba(255, 255, 255, 0.07);
+            --chart-text: #474d57;
+            --scrollbar-thumb: #474d57;
+            --scrollbar-track: #161a1e;
+            --tool-btn-bg: #1e2329;
+            --tool-btn-hover: #2b3139;
+            --bg-deep: #0b0e11;
+            --slider-track: #2b3139;
+        }
+
+        body.light-mode {
+            --bg-body: #ffffff;
+            --bg-panel: #f8f9fa;
+            --bg-header: #f0f1f2;
+            --border-custom: #e0e3e7;
+            --text-main: #1e2329;
+            --text-muted: #707a8a;
+            --bg-input: #f0f1f2;
+            --chart-grid: rgba(0, 0, 0, 0.05);
+            --chart-text: #848e9c;
+            --scrollbar-thumb: #cfd3d8;
+            --scrollbar-track: #f8f9fa;
+            --tool-btn-bg: #f0f1f2;
+            --tool-btn-hover: #e0e3e7;
+            --bg-deep: #ffffff;
+            --slider-track: #d1d5db;
+        }
+
         body {
-            background-color: #0b0e11;
-            color: #eaecef;
+            background-color: var(--bg-body);
+            color: var(--text-main);
             font-family: 'Inter', sans-serif;
             overflow: hidden;
             height: 100vh;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         .mono { font-family: 'JetBrains Mono', monospace; }
 
-        .bg-dark-panel { background-color: #161a1e; }
-        .bg-dark-header { background-color: #1e2329; }
-        .border-gray-custom { border-color: #2b3139; }
+        .bg-dark-panel { background-color: var(--bg-panel); }
+        .bg-dark-header { background-color: var(--bg-header); }
+        .bg-deep { background-color: var(--bg-deep); }
+        .bg-border-custom { background-color: var(--border-custom); }
+        .text-main { color: var(--text-main); }
+        .border-gray-custom { border-color: var(--border-custom); }
 
         .text-buy { color: #00c087; }
         .text-sell { color: #f84960; }
@@ -28,16 +66,16 @@
         .bg-sell { background-color: #f84960; }
 
         ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: #161a1e; }
-        ::-webkit-scrollbar-thumb { background: #474d57; border-radius: 10px; }
+        ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+        ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 10px; }
 
         /* Hide scrollbar for horizontally scrollable areas on mobile */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-        canvas { image-rendering: auto; cursor: crosshair; touch-action: none; }
+        canvas { image-rendering: auto; cursor: crosshair; touch-action: none; background-color: var(--bg-deep); }
 
-        .orderbook-row:hover { background-color: #2b3139; }
+        .orderbook-row:hover { background-color: var(--border-custom); }
         
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { 
@@ -48,16 +86,17 @@
         /* Tooltip Styles */
         #chart-tooltip {
             position: absolute;
-            background: rgba(30, 35, 41, 0.98);
-            border: 1px solid #474d57;
+            background: var(--bg-header);
+            border: 1px solid var(--border-custom);
             padding: 10px;
             border-radius: 4px;
             font-size: 11px;
             pointer-events: none;
             display: none;
             z-index: 50;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
             min-width: 140px;
+            color: var(--text-main);
         }
 
         /* Drawing Toolbar */
@@ -73,16 +112,17 @@
         .tool-btn {
             width: 32px;
             height: 32px;
-            background: #1e2329;
-            border: 1px solid #2b3139;
+            background: var(--tool-btn-bg);
+            border: 1px solid var(--border-custom);
             border-radius: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             transition: all 0.2s;
+            color: var(--text-main);
         }
-        .tool-btn:hover { background: #2b3139; border-color: #474d57; }
+        .tool-btn:hover { background: var(--tool-btn-hover); border-color: var(--text-muted); }
         .tool-btn.active { background: #f3ba2f; border-color: #f3ba2f; color: #000; }
 
         .trade-history-container {
@@ -92,7 +132,7 @@
             padding-right: 5px;
         }
         .trade-history-item {
-            border-bottom: 1px solid #2b3139;
+            border-bottom: 1px solid var(--border-custom);
             padding: 6px 0;
         }
         .trade-history-item:last-child { border-bottom: none; }
@@ -106,7 +146,7 @@
             -webkit-appearance: none;
             width: 100%;
             height: 4px;
-            background: #474d57;
+            background: var(--slider-track);
             border-radius: 2px;
             outline: none;
             position: relative;
@@ -116,11 +156,11 @@
             -webkit-appearance: none;
             width: 14px;
             height: 14px;
-            background: #eaecef;
-            border: 2px solid #F3BA2F;
+            background: #F3BA2F;
+            border: 2px solid var(--bg-panel);
             border-radius: 50%;
             cursor: pointer;
-            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
         .ruler-points {
             position: absolute;
@@ -136,9 +176,9 @@
         .dot {
             width: 8px;
             height: 8px;
-            background: #474d57;
+            background: var(--slider-track);
             border-radius: 50%;
-            border: 2px solid #161a1e;
+            border: 1px solid var(--bg-panel);
             transition: background 0.2s;
         }
         .dot.active {
@@ -157,7 +197,79 @@
             z-index: 10;
             pointer-events: none;
             transition: top 0.1s linear, background-color 0.2s ease;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        /* Theme Toggle Button */
+        .theme-toggle {
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg-input);
+            border: 1px solid var(--border-custom);
+            color: var(--text-main);
+        }
+        .theme-toggle:hover { background: var(--tool-btn-hover); }
+
+        /* Custom Input Styles */
+        input[type="text"], input[type="number"] {
+            color: var(--text-main);
+        }
+        .bg-input-custom {
+            background-color: var(--bg-input);
+        }
+
+        /* Tailwind Gray Overrides for Light Mode */
+        body.light-mode .text-gray-500,
+        body.light-mode .text-gray-400,
+        body.light-mode .text-gray-600 {
+            color: var(--text-muted);
+        }
+        body.light-mode .text-gray-300,
+        body.light-mode .text-gray-200,
+        body.light-mode .text-gray-100 {
+            color: var(--text-main);
+        }
+        
+        @media (max-width: 1024px) {
+            .mobile-trade-form {
+                z-index: 99;
+                margin-top: -43px;
+            }
+        }
+        body.light-mode .bg-gray-800 {
+            background-color: var(--bg-input);
+        }
+        body.light-mode .bg-gray-700 {
+            background-color: var(--border-custom);
+        }
+        body.light-mode .bg-dark-header\/60,
+        body.light-mode .bg-dark-header\/40 {
+            background-color: var(--bg-header);
+        }
+        body.light-mode .bg-dark-panel {
+            background-color: var(--bg-panel);
+        }
+        body.light-mode .border-gray-custom\/30,
+        body.light-mode .border-gray-custom\/50 {
+            border-color: var(--border-custom);
+        }
+        body.light-mode .bg-yellow-400\/10 {
+            background-color: rgba(243, 186, 47, 0.2);
+        }
+        body.light-mode .bg-sell\/10 {
+            background-color: rgba(248, 73, 96, 0.15);
+        }
+        body.light-mode .bg-buy\/10 {
+            background-color: rgba(0, 192, 135, 0.15);
+        }
+        body.light-mode #custom-alert .bg-\[\#1e2329\] {
+            background-color: var(--bg-header);
         }
     </style>
 </head>
@@ -173,7 +285,11 @@
             </div>
         </div>
         <div class="flex items-center space-x-2 md:space-x-4">
-            <button onclick="resetApp()" class="flex items-center space-x-1.5 px-2 md:px-3 py-1.5 bg-[#2b3139] hover:bg-[#474d57] border border-gray-custom rounded transition-all text-gray-300 hover:text-white group">
+            <button onclick="toggleTheme()" class="theme-toggle" title="Toggle Theme">
+                <svg id="theme-icon-sun" class="hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                <svg id="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
+            <button onclick="resetApp()" class="flex items-center space-x-1.5 px-2 md:px-3 py-1.5 bg-input-custom hover:bg-dark-panel border border-gray-custom rounded transition-all text-gray-300 hover:text-white group">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="group-hover:rotate-[-45deg] transition-transform duration-300"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
                 <span class="hidden sm:inline text-[10px] font-bold uppercase tracking-wider">Reset</span>
             </button>
@@ -216,7 +332,7 @@
         </div>
 
         <div class="flex items-center space-x-2 w-full md:w-auto justify-between md:justify-end shrink-0 pt-1 md:pt-0 border-t md:border-t-0 border-gray-custom/50 md:border-transparent">
-            <div id="leverage-selector-container" class="hidden flex items-center bg-[#2b3139] rounded px-2 py-0.5 border border-gray-custom">
+            <div id="leverage-selector-container" class="hidden flex items-center bg-input-custom rounded px-2 py-0.5 border border-gray-custom">
                 <span class="text-[9px] font-bold text-gray-500 mr-2 uppercase">Leverage</span>
                 <select id="leverage-input" onchange="updateLeverage(this.value)" class="bg-transparent text-yellow-400 font-bold outline-none text-[10px] cursor-pointer">
                     <option value="1">1x</option>
@@ -228,7 +344,7 @@
                     <option value="125">125x</option>
                 </select>
             </div>
-            <div class="flex items-center bg-[#0b0e11] rounded p-0.5 border border-gray-custom">
+            <div class="flex items-center bg-deep rounded p-0.5 border border-gray-custom">
                 <button id="mode-spot" onclick="setTradingMode('spot')" class="px-3 md:px-4 py-1 rounded text-[10px] font-bold uppercase transition-all bg-yellow-400 text-black">Spot</button>
                 <button id="mode-futures" onclick="setTradingMode('futures')" class="px-3 md:px-4 py-1 rounded text-[10px] font-bold uppercase transition-all text-gray-500 hover:text-gray-300">Futures</button>
             </div>
@@ -236,7 +352,7 @@
     </div>
 
     <!-- Main Workspace -->
-    <main class="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden no-scrollbar bg-[#0b0e11]">
+    <main class="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden no-scrollbar bg-deep">
         
         <!-- Left Section: Chart -->
         <div class="w-full lg:flex-1 flex flex-col min-h-[400px] lg:min-h-0 border-b lg:border-b-0 lg:border-r border-gray-custom relative shrink-0">
@@ -244,11 +360,11 @@
                 <div class="flex items-center space-x-4">
                     <button class="text-yellow-400 font-bold">Time</button>
                     <div class="flex space-x-1">
-                        <button id="btn-tf-5" onclick="setTimeframe(5)" class="px-2 bg-gray-800 text-white rounded transition-colors">5s</button>
-                        <button id="btn-tf-15" onclick="setTimeframe(15)" class="px-2 text-gray-400 hover:text-white rounded transition-colors">15s</button>
-                        <button id="btn-tf-30" onclick="setTimeframe(30)" class="px-2 text-gray-400 hover:text-white rounded transition-colors">30s</button>
+                        <button id="btn-tf-5" onclick="setTimeframe(5)" class="px-2 bg-input-custom text-main text-yellow-400 font-bold rounded transition-colors">5s</button>
+                        <button id="btn-tf-15" onclick="setTimeframe(15)" class="px-2 text-gray-400 hover:text-main rounded transition-colors">15s</button>
+                        <button id="btn-tf-30" onclick="setTimeframe(30)" class="px-2 text-gray-400 hover:text-main rounded transition-colors">30s</button>
                     </div>
-                    <div class="h-3 w-px bg-gray-700 mx-2"></div>
+                    <div class="h-3 w-px bg-border-custom mx-2"></div>
                     <div class="flex items-center space-x-3">
                         <label class="flex items-center space-x-1 cursor-pointer hover:text-white transition-colors">
                             <input type="checkbox" id="toggle-ma" onchange="toggleIndicator('ma')" class="w-3 h-3 accent-yellow-400">
@@ -303,7 +419,7 @@
         </div>
 
         <!-- Right Section: Trade Form -->
-        <div class="w-full lg:w-80 flex flex-col bg-dark-panel shrink-0 overflow-visible lg:overflow-y-auto">
+        <div class="w-full lg:w-80 flex flex-col bg-dark-panel shrink-0 overflow-visible lg:overflow-y-auto mobile-trade-form">
             <div class="flex border-b border-gray-custom shrink-0 text-[10px] font-bold">
                 <button class="flex-1 py-3 border-b-2 border-yellow-400 text-yellow-400 uppercase tracking-wider">Limit</button>
                 <button class="flex-1 py-3 text-gray-500 hover:text-gray-300 uppercase tracking-wider">Market</button>
@@ -311,7 +427,7 @@
             </div>
 
             <div class="p-2 md:p-4 space-y-2 md:space-y-5">
-                <div class="flex p-0.5 bg-[#0b0e11] rounded shadow-inner">
+                <div class="flex p-0.5 bg-deep rounded shadow-inner">
                     <button id="tab-buy" class="flex-1 py-1.5 md:py-2 rounded bg-buy text-black font-bold text-xs transition-all shadow-md">Buy</button>
                     <button id="tab-sell" class="flex-1 py-1.5 md:py-2 rounded text-gray-400 font-bold text-xs transition-all">Sell</button>
                 </div>
@@ -322,7 +438,7 @@
                         <span id="available-funds-label" class="text-gray-300 mono">1,000.00 USDT</span>
                     </div>
 
-                    <div class="relative group bg-[#2b3139] rounded-md border border-transparent focus-within:border-yellow-400 transition-all duration-200">
+                    <div class="relative group bg-input-custom rounded-md border border-transparent focus-within:border-yellow-400 transition-all duration-200">
                         <label class="text-[9px] text-gray-500 absolute left-2 top-2 font-bold uppercase tracking-wider">Price</label>
                         <div class="flex items-center px-2 pt-5 pb-1.5">
                             <input id="input-price" type="text" class="bg-transparent outline-none text-right text-xs font-bold mono w-full pr-1" value="45,905.30">
@@ -330,7 +446,7 @@
                         </div>
                     </div>
 
-                    <div class="relative group bg-[#2b3139] rounded-md border border-transparent focus-within:border-yellow-400 transition-all duration-200">
+                    <div class="relative group bg-input-custom rounded-md border border-transparent focus-within:border-yellow-400 transition-all duration-200">
                         <label class="text-[9px] text-gray-500 absolute left-2 top-2 font-bold uppercase tracking-wider">Amount</label>
                         <div class="flex items-center px-2 pt-5 pb-1.5">
                             <input id="input-size" type="number" step="0.000001" class="bg-transparent outline-none text-right text-xs font-bold mono w-full pr-1" placeholder="0.000000">
@@ -354,7 +470,7 @@
                         <span>100%</span>
                     </div>
 
-                    <div class="bg-[#0b0e11] p-3 rounded border border-gray-custom/30 text-[10px] space-y-2">
+                    <div class="bg-deep p-3 rounded border border-gray-custom/30 text-[10px] space-y-2">
                         <div class="flex justify-between text-gray-500 font-medium">
                             <span id="summary-usdt-label">Total USDT</span>
                             <span id="available-usdt" class="text-gray-300 mono font-bold">1,000.00</span>
@@ -363,7 +479,7 @@
                             <span id="summary-btc-label">Total BTC</span>
                             <span id="available-btc" class="text-gray-300 mono font-bold">0.000000</span>
                         </div>
-                        <div class="flex justify-between text-gray-500 font-medium border-t border-gray-800 pt-1 mt-1">
+                        <div class="flex justify-between text-gray-500 font-medium border-t border-gray-300 pt-1 mt-1">
                             <span id="max-possible-label" class="text-yellow-500/80 uppercase font-bold tracking-tighter">Max Buying Power</span>
                             <span id="max-possible-val" class="text-yellow-500 mono font-bold">0.333333 BTC</span>
                         </div>
@@ -376,10 +492,10 @@
             </div>
 
             <!-- Portfolio Info -->
-            <div class="mt-auto border-t border-gray-custom p-4 bg-dark-header/60">
+            <div class="mt-auto border-t border-gray-custom p-4 bg-dark-header">
                 <div class="flex justify-between items-center mb-3">
                     <div id="portfolio-title" class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Portfolio Statistics</div>
-                    <button id="btn-close-position" onclick="closePosition()" class="hidden text-[9px] bg-red-900/30 border border-red-500/50 hover:bg-red-500 hover:text-white px-2 py-1 rounded text-red-500 uppercase font-bold transition-all">Close Position</button>
+                    <button id="btn-close-position" onclick="closePosition()" class="hidden text-[9px] bg-sell/10 border border-sell/50 hover:bg-sell hover:text-white px-2 py-1 rounded text-sell uppercase font-bold transition-all">Close Position</button>
                 </div>
                 <div class="space-y-3 text-[12px]">
                     <div class="flex justify-between">
@@ -416,8 +532,8 @@
     </main>
 
     <!-- Alert -->
-    <div id="custom-alert" class="fixed bottom-6 left-6 z-50 transform -translate-x-80 opacity-0 transition-all duration-300">
-        <div class="bg-[#1e2329] border border-gray-custom text-white px-5 py-3 rounded shadow-2xl flex items-center space-x-3 min-w-[240px]">
+    <div id="custom-alert" class="fixed bottom-6 left-6 z-[1000] opacity-0 transition-opacity duration-300 pointer-events-none">
+        <div class="bg-[#1e2329] border border-gray-custom text-main px-5 py-3 rounded shadow-2xl flex items-center space-x-3">
             <div id="alert-dot" class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></div>
             <span id="alert-text" class="text-xs font-medium">Order Executed</span>
         </div>
@@ -474,6 +590,19 @@
         const ctx = canvas.getContext('2d');
         const container = document.getElementById('chart-container');
         const tooltip = document.getElementById('chart-tooltip');
+
+        function toggleTheme() {
+            const body = document.body;
+            body.classList.toggle('light-mode');
+            const isLight = body.classList.contains('light-mode');
+            
+            // Toggle icons
+            document.getElementById('theme-icon-sun').classList.toggle('hidden', !isLight);
+            document.getElementById('theme-icon-moon').classList.toggle('hidden', isLight);
+            
+            // Redraw chart to apply theme-aware colors
+            drawChart();
+        }
 
         function formatNum(num, decimals = 2) {
             return num.toLocaleString('en-US', {
@@ -699,8 +828,8 @@
                 const btn = document.getElementById(`btn-tf-${tf}`);
                 if (btn) {
                     btn.className = tf === seconds 
-                        ? "px-2 bg-gray-800 text-white rounded transition-colors" 
-                        : "px-2 text-gray-400 hover:text-white rounded transition-colors";
+                        ? "px-2 bg-input-custom text-yellow-400 font-bold rounded transition-colors" 
+                        : "px-2 text-gray-400 hover:text-main rounded transition-colors";
                 }
             });
             tickSubCount = 0;
@@ -1034,17 +1163,42 @@
             if (!canvas || !canvas.width) return;
             const s = getChartScale(); ctx.clearRect(0, 0, s.w, s.h);
             const gutterOffset = 35;
-            ctx.strokeStyle = '#2b3139'; ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(s.chartW + gutterOffset, 0); ctx.lineTo(s.chartW + gutterOffset, s.h); ctx.stroke();
-            ctx.strokeStyle = '#1e2329'; ctx.setLineDash([4, 4]); ctx.lineWidth = 0.5;
-            ctx.fillStyle = '#474d57'; ctx.font = '10px JetBrains Mono';
+            
+            // Theme-aware colors
+            const isLight = document.body.classList.contains('light-mode');
+            const gridColor = isLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.15)';
+            const textColor = isLight ? '#848e9c' : '#474d57';
+            const crosshairColor = isLight ? 'rgba(30, 35, 41, 0.25)' : 'rgba(255, 255, 255, 0.25)';
+
+            // Draw Background Grid
+            ctx.strokeStyle = gridColor;
+            ctx.lineWidth = 0.5;
+            ctx.setLineDash([]);
+            
+            // Horizontal Grid Lines
             for(let i = 0; i <= 5; i++) {
                 let price = s.minP + (s.range / 5) * i;
                 let py = getY(price, s);
                 ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(s.chartW + gutterOffset, py); ctx.stroke();
+            }
+
+            // Vertical Grid Lines
+            const verticalGridCount = 8;
+            for(let i = 0; i <= verticalGridCount; i++) {
+                const x = (s.chartW / verticalGridCount) * i;
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, s.h - s.padding); ctx.stroke();
+            }
+
+            // Price Labels and Axis
+            ctx.strokeStyle = isLight ? '#e0e3e7' : '#2b3139'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(s.chartW + gutterOffset, 0); ctx.lineTo(s.chartW + gutterOffset, s.h); ctx.stroke();
+            
+            ctx.fillStyle = textColor; ctx.font = '10px JetBrains Mono';
+            for(let i = 0; i <= 5; i++) {
+                let price = s.minP + (s.range / 5) * i;
+                let py = getY(price, s);
                 ctx.fillText(formatNum(price, 0), s.chartW + gutterOffset + 10, py + 3);
             }
-            ctx.setLineDash([]);
 
             const candleWidth = (s.chartW / visibleCandlesCount) * 0.6;
             const startI = Math.max(0, Math.floor(s.windowStartIdx));
@@ -1053,7 +1207,7 @@
             if (hoverIndex !== null && hoverIndex >= startI && hoverIndex <= endI) {
                 const hoverX = getX(hoverIndex, s);
                 ctx.setLineDash([4, 4]);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.strokeStyle = crosshairColor;
                 ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.moveTo(hoverX, 0);
@@ -1243,9 +1397,9 @@
             let asksHTML = '', bidsHTML = '';
             for(let i = 0; i < 12; i++) {
                 const ap = currentPrice + (12 - i) * (currentPrice * 0.01); const as = (Math.random() * 2).toFixed(3);
-                asksHTML += `<div class="grid grid-cols-3 relative px-1 py-[1.5px] orderbook-row"><div class="absolute right-0 top-0 bottom-0 bg-sell opacity-10" style="width: ${Math.random()*70}%"></div><span class="text-sell font-bold">${formatNum(ap, 1)}</span><span class="text-right text-gray-300 font-medium">${as}</span><span class="text-right text-gray-500 font-medium">${(ap * as / 1000).toFixed(2)}k</span></div>`;
+                asksHTML += `<div class="grid grid-cols-3 relative px-1 py-[1.5px] orderbook-row"><div class="absolute right-0 top-0 bottom-0 bg-sell opacity-10" style="width: ${Math.random()*70}%"></div><span class="text-sell font-bold">${formatNum(ap, 1)}</span><span class="text-right font-medium" style="color: var(--text-main)">${as}</span><span class="text-right font-medium" style="color: var(--text-muted)">${(ap * as / 1000).toFixed(2)}k</span></div>`;
                 const bp = currentPrice - (i + 1) * (currentPrice * 0.01); const bs = (Math.random() * 2).toFixed(3);
-                bidsHTML += `<div class="grid grid-cols-3 relative px-1 py-[1.5px] orderbook-row"><div class="absolute right-0 top-0 bottom-0 bg-buy opacity-10" style="width: ${Math.random()*70}%"></div><span class="text-buy font-bold">${formatNum(bp, 1)}</span><span class="text-right text-gray-300 font-medium">${bs}</span><span class="text-right text-gray-500 font-medium">${(bp * bs / 1000).toFixed(2)}k</span></div>`;
+                bidsHTML += `<div class="grid grid-cols-3 relative px-1 py-[1.5px] orderbook-row"><div class="absolute right-0 top-0 bottom-0 bg-buy opacity-10" style="width: ${Math.random()*70}%"></div><span class="text-buy font-bold">${formatNum(bp, 1)}</span><span class="text-right font-medium" style="color: var(--text-main)">${bs}</span><span class="text-right font-medium" style="color: var(--text-muted)">${(bp * bs / 1000).toFixed(2)}k</span></div>`;
             }
             asksCont.innerHTML = asksHTML; bidsCont.innerHTML = bidsHTML;
             const midPriceEl = document.getElementById('mid-price');
@@ -1368,8 +1522,24 @@
             const alert = document.getElementById('custom-alert'); const dot = document.getElementById('alert-dot');
             const text = document.getElementById('alert-text');
             if (alert && dot && text) {
-                dot.style.backgroundColor = color; text.innerText = msg; alert.style.opacity = "1"; alert.style.transform = "translateX(0)";
-                setTimeout(() => { alert.style.opacity = "0"; alert.style.transform = "translateX(-20rem)"; }, 5000);
+                dot.style.backgroundColor = color; 
+                text.innerText = msg; 
+                
+                // Set background color with low opacity based on the provided color
+                alert.style.backgroundColor = color + '1A'; // 1A is ~10% opacity
+                alert.style.borderColor = color + '40'; // 40 is ~25% opacity
+                
+                alert.style.opacity = "1"; 
+                alert.style.pointerEvents = "auto";
+                setTimeout(() => { 
+                    alert.style.opacity = "0"; 
+                    alert.style.pointerEvents = "none";
+                    // Reset styles after animation
+                    setTimeout(() => {
+                        alert.style.backgroundColor = '';
+                        alert.style.borderColor = '';
+                    }, 300);
+                }, 5000);
             }
         }
 
@@ -1397,12 +1567,12 @@
             list.innerHTML = tradeHistory.map(t => `
                 <div class="trade-history-item flex justify-between items-center">
                     <div class="flex flex-col">
-                        <span class="text-gray-500 text-[8px]">${t.time}</span>
+                        <span style="color: var(--text-muted)" class="text-[8px]">${t.time}</span>
                         <span class="${t.side === 'buy' || t.side === 'long' ? 'text-buy' : 'text-sell'} font-bold uppercase">${t.side} ${t.type}</span>
                     </div>
                     <div class="flex flex-col items-end">
-                        <span class="text-gray-300">${t.amount.toFixed(6)} BTC</span>
-                        <span class="text-gray-500">@ ${formatNum(t.price)}</span>
+                        <span style="color: var(--text-main)">${t.amount.toFixed(6)} BTC</span>
+                        <span style="color: var(--text-muted)">@ ${formatNum(t.price)}</span>
                         ${t.pnl !== null ? `<span class="${t.pnl >= 0 ? 'text-buy' : 'text-sell'} font-bold">${t.pnl >= 0 ? '+' : ''}${formatNum(t.pnl)}</span>` : ''}
                     </div>
                 </div>
@@ -1433,6 +1603,12 @@
             const inputSizeEl = document.getElementById('input-size'); const inputPriceEl = document.getElementById('input-price');
             const requestedSize = parseFloat(inputSizeEl.value); 
             const price = parseFloat(inputPriceEl.value.replace(/,/g, '')) || currentPrice; 
+            
+            // Check for zero balance
+            if (tradingMode === 'spot' && currentMode === 'buy' && usdtBalance <= 0) return showAlert("Insufficient amount", "#f84960");
+            if (tradingMode === 'spot' && currentMode === 'sell' && btcBalance <= 0) return showAlert("Insufficient amount", "#f84960");
+            if (tradingMode === 'futures' && usdtBalance <= 0 && btcBalance <= 0) return showAlert("Insufficient amount", "#f84960");
+
             if(currentSliderPct < 1 && (!requestedSize || requestedSize <= 0)) return showAlert("Invalid Amount", "#f84960");
             
             if(tradingMode === 'spot') {
