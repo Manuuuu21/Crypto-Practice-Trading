@@ -599,6 +599,7 @@
             ma: false,
             bb: false
         };
+        let pendingTextDrawing = null;
         let tradeHistory = [];
 
         const canvas = document.getElementById('trading-chart');
@@ -1128,15 +1129,12 @@
                          document.getElementById('tool-text').classList.remove('active');
                          canvas.style.cursor = 'default';
                     }
-                    const text = prompt("Enter text:");
-                    if (text) {
-                        drawings.push({
-                            type: 'text',
-                            text: text,
-                            idx: getIndexAtX(mouseX, scale),
-                            price: getPriceAtY(mouseY, scale)
-                        });
-                    }
+                    pendingTextDrawing = {
+                        idx: getIndexAtX(mouseX, scale),
+                        price: getPriceAtY(mouseY, scale)
+                    };
+                    document.getElementById('text-modal').classList.remove('hidden');
+                    document.getElementById('text-input').focus();
                 } else {
                     drawings.push({
                         type: activeDrawingTool,
@@ -1739,7 +1737,7 @@
                 <div class="trade-history-item flex justify-between items-center">
                     <div class="flex flex-col">
                         <span style="color: var(--text-muted)" class="text-[8px]">${t.time}</span>
-                        <span class="${t.side === 'buy' || t.side === 'long' ? 'text-buy' : 'text-sell'} font-bold uppercase">${t.side} ${t.type}</span>
+                        <span class="${t.side === 'buy' || t.side === 'long' || t.side === 'close long' ? 'text-buy' : 'text-sell'} font-bold uppercase">${t.side} ${t.type}</span>
                     </div>
                     <div class="flex flex-col items-end">
                         <span style="color: var(--text-main)">${t.amount.toFixed(6)} BTC</span>
@@ -1753,6 +1751,8 @@
         function closePosition(silent = false) {
             if(btcBalance === 0) return;
             let pnl = 0;
+            let wasLong = btcBalance > 0;
+            let closedSize = Math.abs(btcBalance);
             if(tradingMode === 'spot') {
                 pnl = (btcBalance * currentPrice) - (btcBalance * spotEntryPrice);
                 usdtBalance += (btcBalance * currentPrice);
@@ -1765,7 +1765,7 @@
             }
             if(!silent) {
                 showAlert(`Closed: ${pnl >= 0 ? '+' : ''}${formatNum(pnl)} USDT`, pnl >= 0 ? "#00c087" : "#f84960");
-                addTradeToHistory(tradingMode, btcBalance > 0 ? 'close long' : 'close short', Math.abs(btcBalance), currentPrice, pnl);
+                addTradeToHistory(tradingMode, wasLong ? 'close long' : 'close short', closedSize, currentPrice, pnl);
             }
             updateUI();
         }
@@ -1832,6 +1832,34 @@
                 addTradeToHistory(tradingMode, currentMode === 'buy' ? 'long' : 'short', actualSize, price);
             }
             inputSizeEl.value = ""; document.getElementById('money-ruler').value = 0; currentSliderPct = 0; updateSliderDots(0); updateUI();
+        }
+    </script>
+    <div id="text-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="bg-dark-panel border border-gray-custom p-6 rounded-lg w-full max-w-sm shadow-xl">
+            <h3 class="text-main font-bold mb-4">Enter Text</h3>
+            <input type="text" id="text-input" class="w-full bg-input-custom text-main p-2 rounded mb-4 border border-gray-custom focus:outline-none focus:border-yellow-500" placeholder="Type here...">
+            <div class="flex justify-end gap-2">
+                <button onclick="document.getElementById('text-modal').classList.add('hidden')" class="px-4 py-2 text-gray-400 hover:text-main">Cancel</button>
+                <button onclick="confirmTextDrawing()" class="px-4 py-2 bg-yellow-500 text-black font-bold rounded hover:bg-yellow-400">OK</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        function confirmTextDrawing() {
+            const input = document.getElementById('text-input');
+            const text = input.value;
+            if (text && pendingTextDrawing) {
+                drawings.push({
+                    type: 'text',
+                    text: text,
+                    idx: pendingTextDrawing.idx,
+                    price: pendingTextDrawing.price
+                });
+                drawChart();
+            }
+            input.value = '';
+            document.getElementById('text-modal').classList.add('hidden');
+            pendingTextDrawing = null;
         }
     </script>
 </body>
