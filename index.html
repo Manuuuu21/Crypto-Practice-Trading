@@ -1019,6 +1019,9 @@
             } else {
                 isDrawingMode = true;
                 activeDrawingTool = tool;
+                // Hide tooltip when entering drawing mode
+                tooltip.style.display = 'none';
+                hoverIndex = null;
             }
             
             document.getElementById('tool-line').classList.toggle('active', isDrawingMode && activeDrawingTool === 'line');
@@ -1031,7 +1034,7 @@
             const rect = canvas.getBoundingClientRect();
             const coords = getCoords(e);
             
-            if (e.type === 'touchstart') {
+            if (e.type === 'touchstart' && !isDrawingMode) {
                 longPressTimer = setTimeout(() => {
                     isLongPressed = true;
                     isPanning = false;
@@ -1092,7 +1095,7 @@
             const scale = getChartScale();
             if (isDrawing) { drawingCurrent = { x: mouseX, y: mouseY }; drawChart(); return; }
             
-            const shouldShowTooltip = !isTouch || isLongPressed;
+            const shouldShowTooltip = !isDrawingMode && (!isTouch || isLongPressed);
             const index = getIndexAtX(mouseX, scale);
 
             if (shouldShowTooltip && index >= 0 && index < candles.length) {
