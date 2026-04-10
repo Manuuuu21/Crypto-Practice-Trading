@@ -304,7 +304,7 @@
             
             <div class="bg-dark-panel border border-gray-custom rounded px-2 md:px-3 py-1 flex items-center space-x-2">
                 <span class="hidden md:inline text-gray-500 text-[10px] uppercase font-bold tracking-wider">Total Balance</span>
-                <span id="wallet-balance-header" class="font-bold text-xs md:text-sm text-yellow-400 mono">1,000.00</span>
+                <span id="wallet-balance-header" class="font-bold text-xs md:text-sm text-yellow-400 mono">500.00</span>
                 <span class="text-[10px] text-gray-500 font-bold">USDT</span>
             </div>
         </div>
@@ -319,7 +319,7 @@
             </div>
             <div class="shrink-0">
                 <div class="text-gray-500">Last Price</div>
-                <div id="ticker-price" class="font-bold text-buy mono text-sm">45,905.30</div>
+                <div id="ticker-price" class="font-bold text-buy mono text-sm">0.00</div>
                 <div id="ticker-price-php" class="text-[9px] text-gray-500 mono mt-0.5">₱ 0.00</div>
             </div>
             <div class="shrink-0">
@@ -328,11 +328,11 @@
             </div>
             <div>
                 <div class="text-gray-500">24h High</div>
-                <div id="ticker-high" class="text-gray-300 mono font-bold">45,905.30</div>
+                <div id="ticker-high" class="text-gray-300 mono font-bold">0.00</div>
             </div>
             <div>
                 <div class="text-gray-500">24h Low</div>
-                <div id="ticker-low" class="text-gray-300 mono font-bold">45,905.30</div>
+                <div id="ticker-low" class="text-gray-300 mono font-bold">0.00</div>
             </div>
             <div class="hidden lg:block border-l border-gray-custom pl-8 shrink-0">
                 <div class="text-gray-500">Position Size</div>
@@ -449,7 +449,7 @@
                 <div class="space-y-4">
                     <div class="text-[10px] flex justify-between text-gray-500 font-bold uppercase tracking-tighter">
                         <span id="avail-fund-text">Available</span>
-                        <span id="available-funds-label" class="text-gray-300 mono">1,000.00 USDT</span>
+                        <span id="available-funds-label" class="text-gray-300 mono">500.00 USDT</span>
                     </div>
 
                     <div class="relative group bg-input-custom rounded-md border border-transparent focus-within:border-yellow-400 transition-all duration-200">
@@ -487,7 +487,7 @@
                     <div class="bg-deep p-3 rounded border border-gray-custom/30 text-[10px] space-y-2">
                         <div class="flex justify-between text-gray-500 font-medium">
                             <span id="summary-usdt-label">Total USDT</span>
-                            <span id="available-usdt" class="text-gray-300 mono font-bold">1,000.00</span>
+                            <span id="available-usdt" class="text-gray-300 mono font-bold">500.00</span>
                         </div>
                         <div class="flex justify-between text-gray-500 font-medium">
                             <span id="summary-btc-label">Total BTC</span>
@@ -517,7 +517,7 @@
                 <div class="space-y-3 text-[12px]">
                     <div class="flex justify-between">
                         <span class="text-gray-400">Total Net Value</span>
-                        <span id="total-est-value" class="font-bold text-yellow-400 mono">1,000.00 USDT</span>
+                        <span id="total-est-value" class="font-bold text-yellow-400 mono">500.00 USDT</span>
                     </div>
                     <div id="unrealized-pnl-row" class="hidden flex justify-between">
                         <span class="text-gray-400">Unrealized PnL</span>
@@ -561,7 +561,8 @@
 
     <script>
         // --- STATE ---
-        const INITIAL_TOTAL_BALANCE = 500.00;
+        const STARTING_BALANCE = 500.00;
+        let INITIAL_TOTAL_BALANCE = 500.00;
         let usdtBalance = 500.00;
         let btcBalance = 0.00000000;
         let realPrice = 66000.00;
@@ -572,6 +573,7 @@
         let sessionLow = realPrice;
         let currentMode = 'buy'; 
         let tradingMode = 'spot'; 
+        let activePositionMode = null;
         let leverage = 20;
         let entryPrice = 0; 
         let spotEntryPrice = 0; 
@@ -788,12 +790,15 @@
         };
 
         function resetApp() {
-            usdtBalance = INITIAL_TOTAL_BALANCE;
+            usdtBalance = STARTING_BALANCE;
+            INITIAL_TOTAL_BALANCE = STARTING_BALANCE;
             btcBalance = 0;
+            activePositionMode = null;
             entryPrice = 0;
             spotEntryPrice = 0;
             liquidationPrice = 0;
             marginUsed = 0;
+            drawings = [];
             setTradingMode(tradingMode);
             const levInput = document.getElementById('leverage-input');
             if(levInput) levInput.value = levInput.value;
@@ -833,7 +838,6 @@
                 if (btnFutures) btnFutures.className = "px-3 md:px-4 py-1 rounded text-[10px] font-bold uppercase transition-all text-gray-500 hover:text-gray-300";
                 if (tickerBadge) tickerBadge.innerText = "Spot";
                 if (levSelector) levSelector.classList.add('hidden');
-                if (btcBalance !== 0 && entryPrice !== 0) closePosition(true); 
             } else {
                 if (btnFutures) btnFutures.className = "px-3 md:px-4 py-1 rounded text-[10px] font-bold uppercase transition-all bg-yellow-400 text-black";
                 if (btnSpot) btnSpot.className = "px-3 md:px-4 py-1 rounded text-[10px] font-bold uppercase transition-all text-gray-500 hover:text-gray-300";
@@ -1188,7 +1192,7 @@
         }
 
         function checkLiquidation() {
-            if (tradingMode !== 'futures' || btcBalance === 0) return false;
+            if (activePositionMode !== 'futures' || btcBalance === 0) return false;
             
             let unrealizedPnL = 0;
             if(btcBalance > 0) unrealizedPnL = (currentPrice - entryPrice) * btcBalance;
@@ -1202,8 +1206,11 @@
         }
 
         function triggerLiquidation() {
+            const loss = INITIAL_TOTAL_BALANCE; // The balance we had at the start of the trade
             btcBalance = 0; entryPrice = 0; liquidationPrice = 0; usdtBalance = 0; marginUsed = 0;
-            showAlert("LIQUIDATED! Position forced closed at 0 margin.", "#f84960");
+            activePositionMode = null;
+            showAlert("LIQUIDATED! Position forcibly closed. Account balance has been wiped.", "#f84960");
+            addTradeToHistory('futures', 'liquidated', 0, currentPrice, -loss, "-100.00");
             updateUI();
         }
 
@@ -1516,7 +1523,7 @@
                 }
             }
 
-            if (tradingMode === 'spot' && btcBalance > 0) {
+            if (activePositionMode === 'spot' && btcBalance > 0) {
                 const sEntryY = getY(spotEntryPrice, s);
                 if (sEntryY >= 0 && sEntryY <= s.h) {
                     ctx.setLineDash([3, 6]); ctx.strokeStyle = '#f3ba2f'; ctx.lineWidth = 1;
@@ -1526,7 +1533,7 @@
                 }
             }
 
-            if (tradingMode === 'futures' && btcBalance !== 0) {
+            if (activePositionMode === 'futures' && btcBalance !== 0) {
                 const fEntryY = getY(entryPrice, s);
                 if (fEntryY >= 0 && fEntryY <= s.h) {
                     ctx.setLineDash([5, 5]); ctx.strokeStyle = btcBalance > 0 ? 'rgba(0, 192, 135, 0.8)' : 'rgba(248, 73, 96, 0.8)'; ctx.lineWidth = 1.5;
@@ -1573,15 +1580,20 @@
 
         function updateUI() {
             const isPositionOpen = btcBalance !== 0;
+            const effectiveMode = isPositionOpen ? activePositionMode : tradingMode;
             let unrealizedPnL = 0;
             let totalVal = 0;
-            if(tradingMode === 'spot') totalVal = usdtBalance + (btcBalance * currentPrice);
-            else {
+            if(effectiveMode === 'spot') {
+                totalVal = usdtBalance + (btcBalance * currentPrice);
+                if (btcBalance > 0 && spotEntryPrice > 0) {
+                    unrealizedPnL = (currentPrice - spotEntryPrice) * btcBalance;
+                }
+            } else {
                 if(btcBalance > 0) unrealizedPnL = (currentPrice - entryPrice) * btcBalance;
                 else if(btcBalance < 0) unrealizedPnL = (entryPrice - currentPrice) * Math.abs(btcBalance);
                 totalVal = usdtBalance + marginUsed + unrealizedPnL;
             }
-            const totalPnlPct = (((totalVal / INITIAL_TOTAL_BALANCE) - 1) * 100).toFixed(2);
+            const totalPnlPct = INITIAL_TOTAL_BALANCE > 0 ? (((totalVal / INITIAL_TOTAL_BALANCE) - 1) * 100).toFixed(2) : (totalVal === 0 ? "0.00" : "100.00");
             // Anchor 24h Change percentage to the Open of the 1st Candle of the Chart
             const anchorPrice = (candles && candles.length > 0) ? candles[0].open : initialPrice;
             const changePct = ((currentPrice - anchorPrice) / anchorPrice) * 100;
@@ -1612,7 +1624,7 @@
             const btcSideBadge = document.getElementById('btc-side-badge');
             if (availBtcEl) availBtcEl.innerText = Math.abs(btcBalance).toFixed(8);
             if (btcSideBadge) {
-                if (tradingMode === 'futures' && btcBalance !== 0) {
+                if (activePositionMode === 'futures' && btcBalance !== 0) {
                     btcSideBadge.classList.remove('hidden');
                     btcSideBadge.innerText = btcBalance > 0 ? 'LONG' : 'SHORT';
                     btcSideBadge.className = `text-[8px] font-bold px-1 rounded ${btcBalance > 0 ? 'bg-buy/20 text-buy' : 'bg-sell/20 text-sell'}`;
@@ -1647,7 +1659,7 @@
             const closeBtn = document.getElementById('btn-close-position');
             const uPnlEl = document.getElementById('unrealized-pnl');
             const liqValEl = document.getElementById('liq-price-val');
-            if(tradingMode === 'futures' && isPositionOpen) {
+            if(activePositionMode === 'futures' && isPositionOpen) {
                 if (pnlRow) pnlRow.classList.remove('hidden'); 
                 if (liqRow) liqRow.classList.remove('hidden'); 
                 if (closeBtn) closeBtn.classList.remove('hidden');
@@ -1664,10 +1676,10 @@
             const pnlPctEl = document.getElementById('portfolio-pnl-pct');
             if (pnlPctEl) {
                 let displayPct = totalPnlPct;
-                if(tradingMode === 'futures' && isPositionOpen) {
-                    displayPct = ((unrealizedPnL / marginUsed) * 100).toFixed(2);
-                }
-                pnlPctEl.innerText = `${displayPct >= 0 ? '+' : ''}${displayPct}%`;
+                let displayUsdt = totalVal - INITIAL_TOTAL_BALANCE;
+                
+                const usdtSign = displayUsdt >= 0 ? '+' : '';
+                pnlPctEl.innerText = `${displayPct}% (${usdtSign}${formatNum(displayUsdt)} USDT)`;
                 pnlPctEl.className = `font-bold mono ${displayPct >= 0 ? 'text-buy' : 'text-sell'}`;
             }
             const inputPriceEl = document.getElementById('input-price');
@@ -1677,7 +1689,7 @@
             const posSideBadgePort = document.getElementById('pos-side-badge-port');
             if (holdingBtcTicker) holdingBtcTicker.innerText = Math.abs(btcBalance).toFixed(6);
             if (posSideBadge) {
-                if (tradingMode === 'futures' && btcBalance !== 0) {
+                if (activePositionMode === 'futures' && btcBalance !== 0) {
                     posSideBadge.classList.remove('hidden');
                     posSideBadge.innerText = btcBalance > 0 ? 'LONG' : 'SHORT';
                     posSideBadge.className = `text-[8px] font-bold px-1 rounded ${btcBalance > 0 ? 'bg-buy/20 text-buy' : 'bg-sell/20 text-sell'}`;
@@ -1686,7 +1698,7 @@
                 }
             }
             if (posSideBadgePort) {
-                if (tradingMode === 'futures' && btcBalance !== 0) {
+                if (activePositionMode === 'futures' && btcBalance !== 0) {
                     posSideBadgePort.classList.remove('hidden');
                     posSideBadgePort.innerText = btcBalance > 0 ? 'LONG' : 'SHORT';
                     posSideBadgePort.className = `text-[8px] font-bold px-1 rounded ${btcBalance > 0 ? 'bg-buy/20 text-buy' : 'bg-sell/20 text-sell'}`;
@@ -1752,14 +1764,15 @@
             }
         }
 
-        function addTradeToHistory(type, side, amount, price, pnl = null) {
+        function addTradeToHistory(type, side, amount, price, pnl = null, pnlPct = null) {
             const trade = {
                 time: new Date().toLocaleTimeString(),
                 type,
                 side,
                 amount,
                 price,
-                pnl
+                pnl,
+                pnlPct
             };
             tradeHistory.unshift(trade);
             if (tradeHistory.length > 50) tradeHistory.pop();
@@ -1782,7 +1795,7 @@
                     <div class="flex flex-col items-end">
                         <span style="color: var(--text-main)">${t.amount.toFixed(6)} BTC</span>
                         <span style="color: var(--text-muted)">@ ${formatNum(t.price)}</span>
-                        ${t.pnl !== null ? `<span class="${t.pnl >= 0 ? 'text-buy' : 'text-sell'} font-bold">${t.pnl >= 0 ? '+' : ''}${formatNum(t.pnl)}</span>` : ''}
+                        ${t.pnl !== null ? `<span class="${t.pnl >= 0 ? 'text-buy' : 'text-sell'} font-bold">${t.pnl >= 0 ? '+' : ''}${formatNum(t.pnl)} ${t.pnlPct !== null ? `(${t.pnlPct >= 0 ? '+' : ''}${t.pnlPct}%)` : ''}</span>` : ''}
                     </div>
                 </div>
             `).join('');
@@ -1793,7 +1806,8 @@
             let pnl = 0;
             let wasLong = btcBalance > 0;
             let closedSize = Math.abs(btcBalance);
-            if(tradingMode === 'spot') {
+            const modeToClose = activePositionMode || tradingMode;
+            if(modeToClose === 'spot') {
                 pnl = (btcBalance * currentPrice) - (btcBalance * spotEntryPrice);
                 usdtBalance += (btcBalance * currentPrice);
                 btcBalance = 0; spotEntryPrice = 0;
@@ -1803,10 +1817,13 @@
                 usdtBalance += (marginUsed + pnl); 
                 btcBalance = 0; entryPrice = 0; liquidationPrice = 0; marginUsed = 0;
             }
+            
             if(!silent) {
+                const pnlPct = INITIAL_TOTAL_BALANCE > 0 ? ((pnl / INITIAL_TOTAL_BALANCE) * 100).toFixed(2) : "0.00";
                 showAlert(`Closed: ${pnl >= 0 ? '+' : ''}${formatNum(pnl)} USDT`, pnl >= 0 ? "#00c087" : "#f84960");
-                addTradeToHistory(tradingMode, wasLong ? 'close long' : 'close short', closedSize, currentPrice, pnl);
+                addTradeToHistory(modeToClose, wasLong ? 'close long' : 'close short', closedSize, currentPrice, pnl, pnlPct);
             }
+            activePositionMode = null;
             updateUI();
         }
 
@@ -1823,6 +1840,12 @@
             if(currentSliderPct < 1 && (!requestedSize || requestedSize <= 0)) return showAlert("Invalid Amount", "#f84960");
             
             if(tradingMode === 'spot') {
+                if (btcBalance !== 0 && activePositionMode !== 'spot') {
+                    closePosition(true);
+                }
+                // Update baseline to current equity before opening new position
+                if (btcBalance === 0) INITIAL_TOTAL_BALANCE = usdtBalance + (btcBalance * currentPrice);
+                
                 if(currentMode === 'buy') {
                     const actualSize = (currentSliderPct === 100) ? (usdtBalance / price) : requestedSize;
                     const cost = actualSize * price;
@@ -1830,22 +1853,32 @@
                     spotEntryPrice = ((btcBalance * spotEntryPrice) + (actualSize * price)) / (btcBalance + actualSize);
                     btcBalance += actualSize; 
                     usdtBalance = Math.max(0, usdtBalance - cost);
+                    activePositionMode = 'spot';
                     showAlert(`Bought ${actualSize.toFixed(6)} BTC`, "#00c087");
                     addTradeToHistory('spot', 'buy', actualSize, price);
                 } else {
                     const actualSize = (currentSliderPct === 100) ? btcBalance : requestedSize;
                     if (actualSize > btcBalance + 0.000001 || actualSize <= 0) return showAlert("Insufficient BTC", "#f84960");
+                    const sellPnl = (price - spotEntryPrice) * actualSize;
+                    const sellPnlPct = INITIAL_TOTAL_BALANCE > 0 ? ((sellPnl / INITIAL_TOTAL_BALANCE) * 100).toFixed(2) : "0.00";
+
                     btcBalance = Math.max(0, btcBalance - actualSize); 
-                    if(btcBalance === 0) spotEntryPrice = 0;
+                    if(btcBalance === 0) {
+                        spotEntryPrice = 0;
+                        activePositionMode = null;
+                    }
                     usdtBalance += (actualSize * price);
                     showAlert(`Sold ${actualSize.toFixed(6)} BTC`, "#00c087");
-                    addTradeToHistory('spot', 'sell', actualSize, price);
+                    addTradeToHistory('spot', 'sell', actualSize, price, sellPnl, sellPnlPct);
                 }
             } else {
                 // BUG FIX: Automatically close any existing position before opening a new one in Futures
                 if (btcBalance !== 0) {
                     closePosition(true); // Close existing silently
                 }
+
+                // Update baseline to current equity before opening new position
+                if (btcBalance === 0) INITIAL_TOTAL_BALANCE = usdtBalance;
 
                 const buyingPower = usdtBalance * leverage; // usdtBalance is updated after closePosition
                 const actualSize = Math.abs((currentSliderPct === 100) ? (buyingPower / price) : requestedSize);
@@ -1854,6 +1887,8 @@
                 if(marginReq > usdtBalance + 0.01) return showAlert("Insufficient Margin", "#f84960");
                 
                 // Initialize the new position
+                activePositionMode = 'futures';
+                equityAtTradeStart = usdtBalance + marginReq; // Total Net Value before opening
                 entryPrice = price;
                 marginUsed = marginReq;
                 usdtBalance -= marginReq;
