@@ -1678,8 +1678,9 @@
                 let displayPct = totalPnlPct;
                 let displayUsdt = totalVal - INITIAL_TOTAL_BALANCE;
                 
+                const pctSign = displayPct >= 0 ? '+' : '';
                 const usdtSign = displayUsdt >= 0 ? '+' : '';
-                pnlPctEl.innerText = `${displayPct}% (${usdtSign}${formatNum(displayUsdt)} USDT)`;
+                pnlPctEl.innerText = `${pctSign}${displayPct}% (${usdtSign}${formatNum(displayUsdt)} USDT)`;
                 pnlPctEl.className = `font-bold mono ${displayPct >= 0 ? 'text-buy' : 'text-sell'}`;
             }
             const inputPriceEl = document.getElementById('input-price');
