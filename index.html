@@ -601,6 +601,8 @@
         };
         let pendingTextDrawing = null;
         let tradeHistory = [];
+        let alertTimeout = null;
+        let alertResetTimeout = null;
 
         const canvas = document.getElementById('trading-chart');
         const ctx = canvas.getContext('2d');
@@ -1694,6 +1696,10 @@
             const alert = document.getElementById('custom-alert'); const dot = document.getElementById('alert-dot');
             const text = document.getElementById('alert-text');
             if (alert && dot && text) {
+                // Clear existing timeouts to prevent premature closing
+                if (alertTimeout) clearTimeout(alertTimeout);
+                if (alertResetTimeout) clearTimeout(alertResetTimeout);
+
                 dot.style.backgroundColor = color; 
                 text.innerText = msg; 
                 
@@ -1703,14 +1709,17 @@
                 
                 alert.style.opacity = "1"; 
                 alert.style.pointerEvents = "auto";
-                setTimeout(() => { 
+                
+                alertTimeout = setTimeout(() => { 
                     alert.style.opacity = "0"; 
                     alert.style.pointerEvents = "none";
                     // Reset styles after animation
-                    setTimeout(() => {
+                    alertResetTimeout = setTimeout(() => {
                         alert.style.backgroundColor = '';
                         alert.style.borderColor = '';
+                        alertResetTimeout = null;
                     }, 300);
+                    alertTimeout = null;
                 }, 5000);
             }
         }
