@@ -37,7 +37,7 @@ A cryptocurrency trading simulator for practicing spot and futures trading with 
 
 ## How to Use
 
-1. Start with 1,000 USDT practice balance
+1. Start with 500 USDT practice balance
 2. Choose **Spot** or **Futures** mode
 3. Set price and amount (or use the % slider)
 4. Click **Buy/Sell** to execute trades
