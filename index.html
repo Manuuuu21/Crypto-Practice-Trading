@@ -185,10 +185,8 @@
             background: #F3BA2F;
         }
 
-        /* Price Label updated for better distance and visibility */
-        #chart-price-label {
+        #chart-price-label, #chart-hover-price-label {
             position: absolute;
-            right: 8px;
             padding: 4px 10px;
             border-radius: 3px;
             font-family: 'JetBrains Mono', monospace;
@@ -196,8 +194,18 @@
             font-weight: 700;
             z-index: 10;
             pointer-events: none;
-            transition: top 0.1s linear, background-color 0.2s ease;
             box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        #chart-price-label {
+            transition: top 0.1s linear, background-color 0.2s ease;
+        }
+
+        #chart-hover-price-label {
+            background-color: #474d57;
+            color: #ffffff;
+            display: none;
+            z-index: 11;
         }
 
         /* Theme Toggle Button */
@@ -402,6 +410,7 @@
                 
                 <canvas id="trading-chart"></canvas>
                 <div id="chart-price-label">45,905.30</div>
+                <div id="chart-hover-price-label">0.00</div>
             </div>
         </div>
 
@@ -1327,17 +1336,20 @@
                 
                 ctx.setLineDash([]);
 
-                // Price label on axis
-                const hoverPrice = getPriceAtY(hoverY, s);
-                const labelText = formatNum(hoverPrice, 0);
-                const labelWidth = ctx.measureText(labelText).width + 10;
-                const labelHeight = 16;
-                
-                ctx.fillStyle = isLight ? '#e0e3e7' : '#2b3139'; 
-                ctx.fillRect(s.chartW + gutterOffset, hoverY - labelHeight/2, labelWidth, labelHeight);
-                
-                ctx.fillStyle = isLight ? '#1e2329' : '#ffffff';
-                ctx.fillText(labelText, s.chartW + gutterOffset + 5, hoverY + 4);
+                // Update HTML Hover Price Label
+                const hoverPriceLabel = document.getElementById('chart-hover-price-label');
+                if (hoverPriceLabel) {
+                    const hoverPrice = getPriceAtY(hoverY, s);
+                    hoverPriceLabel.innerText = formatNum(hoverPrice, 0);
+                    hoverPriceLabel.style.top = `${hoverY - 12}px`;
+                    hoverPriceLabel.style.left = `${s.chartW + gutterOffset}px`;
+                    hoverPriceLabel.style.display = 'block';
+                    // Adjust background based on theme
+                    hoverPriceLabel.style.backgroundColor = isLight ? '#474d57' : '#2b3139';
+                }
+            } else {
+                const hoverPriceLabel = document.getElementById('chart-hover-price-label');
+                if (hoverPriceLabel) hoverPriceLabel.style.display = 'none';
             }
 
             const visibleSubset = candles.slice(startI, endI + 1);
@@ -1522,6 +1534,7 @@
             const label = document.getElementById('chart-price-label');
             if (label) {
                 label.style.top = `${py - 12}px`;
+                label.style.left = `${s.chartW + gutterOffset}px`;
                 label.innerText = formatNum(currentPrice);
                 label.style.backgroundColor = currentPrice >= lastPrice ? '#00c087' : '#f84960';
                 label.style.color = '#000';
