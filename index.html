@@ -529,7 +529,7 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-400" id="pnl-pct-label">Total Profit / Loss</span>
-                        <span id="portfolio-pnl-pct" class="font-bold text-buy mono text-sm">+0.00%</span>
+                        <span id="portfolio-pnl-pct" class="font-bold text-gray-400 mono text-sm">0.00% (0.00 USDT)</span>
                     </div>
                     <div class="flex justify-between border-t border-gray-custom/30 pt-3 text-[10px]">
                         <span id="inventory-label" class="text-gray-500 uppercase font-bold tracking-tighter">Current Inventory:</span>
@@ -1678,10 +1678,17 @@
                 let displayPct = totalPnlPct;
                 let displayUsdt = totalVal - INITIAL_TOTAL_BALANCE;
                 
-                const pctSign = displayPct >= 0 ? '+' : '';
-                const usdtSign = displayUsdt >= 0 ? '+' : '';
+                const isZero = Math.abs(displayUsdt) < 0.01;
+                const pctSign = (parseFloat(displayPct) > 0) ? '+' : '';
+                const usdtSign = (displayUsdt > 0.005) ? '+' : '';
+                
                 pnlPctEl.innerText = `${pctSign}${displayPct}% (${usdtSign}${formatNum(displayUsdt)} USDT)`;
-                pnlPctEl.className = `font-bold mono ${displayPct >= 0 ? 'text-buy' : 'text-sell'}`;
+                
+                let colorClass = 'text-gray-400';
+                if (!isZero) {
+                    colorClass = displayUsdt > 0 ? 'text-buy' : 'text-sell';
+                }
+                pnlPctEl.className = `font-bold mono text-sm ${colorClass}`;
             }
             const inputPriceEl = document.getElementById('input-price');
             if (inputPriceEl && document.activeElement !== inputPriceEl) inputPriceEl.value = formatNum(currentPrice);
