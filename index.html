@@ -529,7 +529,7 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-400" id="pnl-pct-label">Total Profit / Loss</span>
-                        <span id="portfolio-pnl-pct" class="font-bold text-gray-400 mono text-sm">0.00% (0.00 USDT)</span>
+                        <span id="portfolio-pnl-pct" class="font-bold text-gray-400 mono text-s">0.00% (0.00 USDT)</span>
                     </div>
                     <div class="flex justify-between border-t border-gray-custom/30 pt-3 text-[10px]">
                         <span id="inventory-label" class="text-gray-500 uppercase font-bold tracking-tighter">Current Inventory:</span>
@@ -1688,7 +1688,7 @@
                 if (!isZero) {
                     colorClass = displayUsdt > 0 ? 'text-buy' : 'text-sell';
                 }
-                pnlPctEl.className = `font-bold mono text-sm ${colorClass}`;
+                pnlPctEl.className = `font-bold mono text-s ${colorClass}`;
             }
             const inputPriceEl = document.getElementById('input-price');
             if (inputPriceEl && document.activeElement !== inputPriceEl) inputPriceEl.value = formatNum(currentPrice);
