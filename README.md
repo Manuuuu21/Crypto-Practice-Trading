@@ -1,4 +1,4 @@
-# 🚀 Crypto Practice Trading
+# 🚀 Crypto Trading Simulator
 
 A cryptocurrency trading simulator for practicing spot and futures trading with realistic candlestick charts.
 
