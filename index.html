@@ -517,11 +517,17 @@
                 <div class="space-y-3 text-[12px]">
                     <div class="flex justify-between">
                         <span class="text-gray-400">Total Net Value</span>
-                        <span id="total-est-value" class="font-bold text-yellow-400 mono">500.00 USDT</span>
+                        <div class="text-right">
+                            <div id="total-est-value" class="font-bold text-yellow-400 mono">500.00 USDT</div>
+                            <div id="total-est-value-php" class="text-[10px] text-gray-500 mono">₱ 28,000.00</div>
+                        </div>
                     </div>
                     <div id="unrealized-pnl-row" class="hidden flex justify-between">
                         <span class="text-gray-400">Unrealized PnL</span>
-                        <span id="unrealized-pnl" class="font-bold text-gray-300 mono">0.00 USDT</span>
+                        <div class="text-right">
+                            <div id="unrealized-pnl" class="font-bold text-gray-300 mono">0.00 USDT</div>
+                            <div id="unrealized-pnl-php" class="text-[10px] text-gray-500 mono">₱ 0.00</div>
+                        </div>
                     </div>
                     <div id="liq-price-row" class="hidden flex justify-between border-b border-gray-custom/30 pb-1 mb-1">
                         <span class="text-sell font-bold uppercase text-[10px]">Liq. Price</span>
@@ -529,7 +535,10 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-400" id="pnl-pct-label">Total Profit / Loss</span>
-                        <span id="portfolio-pnl-pct" class="font-bold text-gray-400 mono text-s">0.00% (0.00 USDT)</span>
+                        <div class="text-right">
+                            <div id="portfolio-pnl-pct" class="font-bold text-gray-400 mono text-s">0.00% (0.00 USDT)</div>
+                            <div id="portfolio-pnl-php" class="text-[10px] text-gray-500 mono">₱ 0.00</div>
+                        </div>
                     </div>
                     <div class="flex justify-between border-t border-gray-custom/30 pt-3 text-[10px]">
                         <span id="inventory-label" class="text-gray-500 uppercase font-bold tracking-tighter">Current Inventory:</span>
@@ -562,8 +571,8 @@
     <script>
         // --- STATE ---
         const STARTING_BALANCE = 500.00;
-        let INITIAL_TOTAL_BALANCE = 500.00;
-        let usdtBalance = 500.00;
+        let INITIAL_TOTAL_BALANCE = STARTING_BALANCE;
+        let usdtBalance = STARTING_BALANCE;
         let btcBalance = 0.00000000;
         let realPrice = 66000.00;
         let initialPrice = realPrice;
@@ -1652,6 +1661,11 @@
             }
             const totalEstEl = document.getElementById('total-est-value');
             if (totalEstEl) totalEstEl.innerText = formatNum(totalVal) + " USDT";
+            const totalEstPhpEl = document.getElementById('total-est-value-php');
+            if (totalEstPhpEl) {
+                const totalValPhp = totalVal * usdToPhpRate;
+                totalEstPhpEl.innerText = `₱ ${totalValPhp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
             const inventoryValEl = document.getElementById('holding-btc-val');
             if (inventoryValEl) inventoryValEl.innerText = `${Math.abs(btcBalance).toFixed(6)} BTC`;
             const pnlRow = document.getElementById('unrealized-pnl-row');
@@ -1667,6 +1681,13 @@
                     uPnlEl.innerText = `${unrealizedPnL >= 0 ? '+' : ''}${formatNum(unrealizedPnL)} USDT`;
                     uPnlEl.className = `font-bold mono ${unrealizedPnL >= 0 ? 'text-buy' : 'text-sell'}`;
                 }
+                const uPnlPhpEl = document.getElementById('unrealized-pnl-php');
+                if (uPnlPhpEl) {
+                    const uPnlPhp = unrealizedPnL * usdToPhpRate;
+                    const sign = unrealizedPnL > 0 ? '+' : (unrealizedPnL < 0 ? '-' : '');
+                    uPnlPhpEl.innerText = `${sign}₱ ${Math.abs(uPnlPhp).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    uPnlPhpEl.className = `text-[10px] mono ${unrealizedPnL > 0 ? 'text-buy' : (unrealizedPnL < 0 ? 'text-sell' : 'text-gray-500')}`;
+                }
                 if (liqValEl) liqValEl.innerText = formatNum(liquidationPrice) + " USDT";
             } else { 
                 if (pnlRow) pnlRow.classList.add('hidden'); 
@@ -1674,6 +1695,7 @@
                 if (closeBtn) closeBtn.classList.add('hidden'); 
             }
             const pnlPctEl = document.getElementById('portfolio-pnl-pct');
+            const pnlPhpEl = document.getElementById('portfolio-pnl-php');
             if (pnlPctEl) {
                 let displayPct = totalPnlPct;
                 let displayUsdt = totalVal - INITIAL_TOTAL_BALANCE;
@@ -1683,6 +1705,13 @@
                 const usdtSign = (displayUsdt > 0.005) ? '+' : '';
                 
                 pnlPctEl.innerText = `${pctSign}${displayPct}% (${usdtSign}${formatNum(displayUsdt)} USDT)`;
+                
+                if (pnlPhpEl) {
+                    const displayPhp = displayUsdt * usdToPhpRate;
+                    const phpSign = displayUsdt > 0.005 ? '+' : (displayUsdt < -0.005 ? '-' : '');
+                    pnlPhpEl.innerText = `${phpSign}₱ ${Math.abs(displayPhp).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    pnlPhpEl.className = `text-[10px] mono ${isZero ? 'text-gray-500' : (displayUsdt > 0 ? 'text-buy' : 'text-sell')}`;
+                }
                 
                 let colorClass = 'text-gray-400';
                 if (!isZero) {
