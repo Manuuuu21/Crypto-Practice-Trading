@@ -3,6 +3,9 @@
 A cryptocurrency trading simulator for practicing spot and futures trading with realistic candlestick charts.
 
 **[Try it Live](https://manuuuu21.github.io/Crypto-Trading-Simulator/)**
+---
+![Img](https://github.com/Manuuuu21/rAthena-Text-Editor/blob/main/{5ED6D81F-6654-49CD-AD84-B45D0B97C268}.png)
+![Img](https://github.com/Manuuuu21/rAthena-Text-Editor/blob/main/{DA097D50-376D-4D6C-A8CD-4CC7808095EF}.png)
 
 ## Features
 
