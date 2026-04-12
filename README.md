@@ -2,7 +2,7 @@
 
 A cryptocurrency trading simulator for practicing spot and futures trading with realistic candlestick charts.
 
-**[Try it Live](https://manuuuu21.github.io/Crypto-Practice-Trading/)**
+**[Try it Live](https://manuuuu21.github.io/Crypto-Trading-Simulator/)**
 
 ## Features
 
