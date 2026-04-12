@@ -1832,7 +1832,14 @@
                     <div class="flex flex-col items-end">
                         <span style="color: var(--text-main)">${t.amount.toFixed(6)} BTC</span>
                         <span style="color: var(--text-muted)">@ ${formatNum(t.price)}</span>
-                        ${t.pnl !== null ? `<span class="${t.pnl >= 0 ? 'text-buy' : 'text-sell'} font-bold">${t.pnl >= 0 ? '+' : ''}${formatNum(t.pnl)} ${t.pnlPct !== null ? `(${t.pnlPct >= 0 ? '+' : ''}${t.pnlPct}%)` : ''}</span>` : ''}
+                        ${t.pnl !== null ? `
+                            <span class="${t.pnl > 0 ? 'text-buy' : (t.pnl < 0 ? 'text-sell' : 'text-gray-500')} font-bold">
+                                ${t.pnl > 0 ? '+' : ''}${formatNum(t.pnl)} ${t.pnlPct !== null ? `(${t.pnlPct > 0 ? '+' : ''}${t.pnlPct}%)` : ''}
+                            </span>
+                            <span class="${t.pnl > 0 ? 'text-buy' : (t.pnl < 0 ? 'text-sell' : 'text-gray-500')} text-[9px] mono">
+                                ${t.pnl > 0 ? '+' : (t.pnl < 0 ? '-' : '')}₱ ${Math.abs(t.pnl * usdToPhpRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                        ` : ''}
                     </div>
                 </div>
             `).join('');
